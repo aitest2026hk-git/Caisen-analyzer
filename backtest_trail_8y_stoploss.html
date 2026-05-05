@@ -1,0 +1,3017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trail Analyzer 8Y Backtest + Stop Loss — HK Blue Chips</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#c9d1d9;padding:20px}
+h1{text-align:center;color:#58a6ff;margin-bottom:4px;font-size:26px}
+.subtitle{text-align:center;color:#8b949e;margin-bottom:24px;font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;max-width:1200px;margin-left:auto;margin-right:auto}
+.stat{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px;text-align:center}
+.stat .num{font-size:26px;font-weight:700}.stat .label{color:#8b949e;font-size:11px;margin-top:4px}
+.green{color:#3fb950}.red{color:#f85149}.yellow{color:#d29922}.blue{color:#58a6ff}
+.justify{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;margin-bottom:24px;max-width:1200px;margin-left:auto;margin-right:auto;font-size:13px;line-height:1.7}
+.justify h3{color:#58a6ff;margin-bottom:12px;font-size:16px}.justify ul{margin-left:20px;margin-bottom:12px}.justify li{margin-bottom:6px}
+table{width:100%;border-collapse:collapse;font-size:13px;background:#161b22;border-radius:8px;overflow:hidden;margin-bottom:24px}
+th{background:#21262d;color:#8b949e;padding:10px 12px;text-align:right;font-weight:500;position:sticky;top:0}
+th:first-child,th:nth-child(2),th:nth-child(3){text-align:left}
+td{padding:8px 12px;text-align:right;border-bottom:1px solid #21262d}
+td:first-child{text-align:left;color:#58a6ff;font-weight:600}
+td:nth-child(2){text-align:left;color:#c9d1d9}
+td:nth-child(3){text-align:left;color:#8b949e}
+tr:hover{background:#1c2128}
+.month-section{margin-bottom:20px;background:#161b22;border:1px solid #30363d;border-radius:8px;overflow:hidden}
+.month-header{background:#21262d;padding:12px 18px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.month-header:hover{background:#30363d}
+.month-header h2{color:#58a6ff;font-size:16px}
+.month-header .meta{color:#8b949e;font-size:12px}
+.month-header .arrow{color:#8b949e;font-size:16px}
+.month-header.collapsed .arrow{transform:rotate(-90deg)}
+.month-body{display:none}.month-body.show{display:block}
+.badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600}
+.badge-up{background:#0d1f0d;color:#3fb950}.badge-down{background:#1f0d0d;color:#f85149}.badge-stop{background:#2d1016;color:#ff7b72}
+.chart-container{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;margin-bottom:24px;max-width:1200px;margin-left:auto;margin-right:auto}
+.filter-bar{padding:10px 16px;background:#0d1117;display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.filter-bar input{background:#161b22;border:1px solid #30363d;color:#c9d1d9;padding:8px 12px;border-radius:6px;font-size:14px;width:280px}
+.filter-bar input:focus{outline:none;border-color:#58a6ff}
+.nav-top{position:fixed;bottom:20px;right:20px;background:#21262d;border:1px solid #30363d;color:#58a6ff;padding:10px 14px;border-radius:8px;cursor:pointer;font-size:14px;text-decoration:none}
+</style>
+</head>
+<body>
+<h1>📈 Trail Analyzer — 8Y Backtest + 10.0% Stop Loss</h1>
+<p class="subtitle">HK Blue Chips | 2018-10 → 2026-04 | Top 2 Monthly | Buy Open → Sell Close/Stop | 2026-05-05 15:18</p>
+
+<div class="stats">
+<div class="stat"><div class="num green">78</div><div class="label">Winners (43%)</div></div>
+<div class="stat"><div class="num red">104</div><div class="label">Losers (57%)</div></div>
+<div class="stat"><div class="num red">81</div><div class="label">Stopped Out</div></div>
+<div class="stat"><div class="num green">+128.5%</div><div class="label">Cumulative</div></div>
+<div class="stat"><div class="num blue">+12.6%</div><div class="label">CAGR</div></div>
+<div class="stat"><div class="num yellow">0.52</div><div class="label">Sharpe</div></div>
+<div class="stat"><div class="num red">104.7%</div><div class="label">Max DD</div></div>
+<div class="stat"><div class="num green">1.35</div><div class="label">Profit Factor</div></div>
+</div>
+
+<div class="justify">
+<h3>📖 Strategy & Stop Loss Logic</h3>
+<ul>
+<li><b>Entry:</b> Buy on Open of first trading day each month. Top 2 stocks ranked by Risk% (distance above Chandelier Exit).</li>
+<li><b>Stop Loss:</b> If stock's Low during month hits <code>max(buy_price × 90%, chandelier_stop)</code>, sell immediately at stop price.</li>
+<li><b>Exit:</b> If no stop hit, sell at Close on last trading day of month.</li>
+<li><b>Why 10.0%:</b> Limits max loss per trade. Without stop, worst case was -32.5%. With stop, worst case capped at -10.0%.</li>
+</ul>
+<h3>⚠️ Risks</h3>
+<ul>
+<li>Survivorship bias (only current HSI blue chips tested)</li>
+<li>No transaction costs (brokerage, stamp duty ~0.1%)</li>
+<li>2 stocks/month = high concentration</li>
+<li>Stop loss can lock in losses that later recover (whipsaw)</li>
+</ul>
+</div>
+
+<div class="chart-container">
+<h3 style="color:#58a6ff;margin-bottom:10px">📊 Monthly Returns</h3>
+<div style="display:flex;align-items:flex-end;height:100px;gap:1px">
+<div style="width:4px;height:15px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2018-10: -10.0%"></div><div style="width:4px;height:7px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2018-11: +4.9%"></div><div style="width:4px;height:2px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2018-12: -1.7%"></div><div style="width:4px;height:2px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2019-01: +1.7%"></div><div style="width:4px;height:10px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2019-02: +6.9%"></div><div style="width:4px;height:17px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2019-03: +11.1%"></div><div style="width:4px;height:11px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2019-04: +7.4%"></div><div style="width:4px;height:10px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2019-05: -6.6%"></div><div style="width:4px;height:1px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2019-06: +1.1%"></div><div style="width:4px;height:2px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2019-07: -1.9%"></div><div style="width:4px;height:11px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2019-08: -7.4%"></div><div style="width:4px;height:14px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2019-09: -8.9%"></div><div style="width:4px;height:29px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2019-10: +18.4%"></div><div style="width:4px;height:1px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2019-11: -0.7%"></div><div style="width:4px;height:8px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2019-12: +5.7%"></div><div style="width:4px;height:9px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2020-01: -6.1%"></div><div style="width:4px;height:30px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2020-02: +19.1%"></div><div style="width:4px;height:11px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2020-03: -7.5%"></div><div style="width:4px;height:17px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2020-04: +11.1%"></div><div style="width:4px;height:24px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2020-05: +15.6%"></div><div style="width:4px;height:14px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2020-06: +9.3%"></div><div style="width:4px;height:4px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2020-07: +2.8%"></div><div style="width:4px;height:10px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2020-08: +6.8%"></div><div style="width:4px;height:15px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2020-09: -9.6%"></div><div style="width:4px;height:16px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2020-10: +10.5%"></div><div style="width:4px;height:28px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2020-11: +17.9%"></div><div style="width:4px;height:11px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2020-12: +7.2%"></div><div style="width:4px;height:11px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2021-01: -7.2%"></div><div style="width:4px;height:8px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2021-02: -5.1%"></div><div style="width:4px;height:1px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2021-03: -1.0%"></div><div style="width:4px;height:11px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2021-04: +7.0%"></div><div style="width:4px;height:4px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2021-05: +2.9%"></div><div style="width:4px;height:37px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2021-06: +24.0%"></div><div style="width:4px;height:15px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2021-07: -9.9%"></div><div style="width:4px;height:12px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2021-08: -7.7%"></div><div style="width:4px;height:15px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2021-09: -10.0%"></div><div style="width:4px;height:5px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2021-10: -3.4%"></div><div style="width:4px;height:4px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2021-11: -3.1%"></div><div style="width:4px;height:24px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2021-12: +15.6%"></div><div style="width:4px;height:1px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2022-01: -0.4%"></div><div style="width:4px;height:5px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2022-02: -3.5%"></div><div style="width:4px;height:15px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2022-03: -9.8%"></div><div style="width:4px;height:5px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2022-04: -3.6%"></div><div style="width:4px;height:14px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2022-05: -9.1%"></div><div style="width:4px;height:4px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2022-06: +2.9%"></div><div style="width:4px;height:3px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2022-07: -2.4%"></div><div style="width:4px;height:15px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2022-08: -10.0%"></div><div style="width:4px;height:15px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2022-09: -10.0%"></div><div style="width:4px;height:8px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2022-10: -5.3%"></div><div style="width:4px;height:29px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2022-11: +18.5%"></div><div style="width:4px;height:15px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2022-12: -10.0%"></div><div style="width:4px;height:6px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2023-01: -4.0%"></div><div style="width:4px;height:6px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2023-02: -4.3%"></div><div style="width:4px;height:7px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2023-03: +4.7%"></div><div style="width:4px;height:8px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2023-04: -5.3%"></div><div style="width:4px;height:9px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2023-05: -6.3%"></div><div style="width:4px;height:9px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2023-06: +6.3%"></div><div style="width:4px;height:2px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2023-07: +1.7%"></div><div style="width:4px;height:13px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2023-08: -8.4%"></div><div style="width:4px;height:3px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2023-09: -2.4%"></div><div style="width:4px;height:1px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2023-10: -0.4%"></div><div style="width:4px;height:4px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2023-11: +2.9%"></div><div style="width:4px;height:15px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2023-12: -10.0%"></div><div style="width:4px;height:15px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2024-01: -10.0%"></div><div style="width:4px;height:12px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2024-02: -7.7%"></div><div style="width:4px;height:36px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2024-03: +22.8%"></div><div style="width:4px;height:1px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2024-04: -0.1%"></div><div style="width:4px;height:2px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2024-05: -1.3%"></div><div style="width:4px;height:1px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2024-06: +1.2%"></div><div style="width:4px;height:9px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2024-07: -5.7%"></div><div style="width:4px;height:4px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2024-08: +3.2%"></div><div style="width:4px;height:45px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2024-09: +28.5%"></div><div style="width:4px;height:1px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2024-10: -0.5%"></div><div style="width:4px;height:5px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2024-11: -3.6%"></div><div style="width:4px;height:22px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2024-12: +14.4%"></div><div style="width:4px;height:3px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2025-01: +2.4%"></div><div style="width:4px;height:40px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2025-02: +25.9%"></div><div style="width:4px;height:6px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2025-03: -4.3%"></div><div style="width:4px;height:13px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2025-04: -8.6%"></div><div style="width:4px;height:1px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2025-05: -0.5%"></div><div style="width:4px;height:20px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2025-06: +12.9%"></div><div style="width:4px;height:8px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2025-07: -5.2%"></div><div style="width:4px;height:1px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2025-08: -0.7%"></div><div style="width:4px;height:7px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2025-09: -4.9%"></div><div style="width:4px;height:2px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2025-10: +1.5%"></div><div style="width:4px;height:9px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2025-11: +6.3%"></div><div style="width:4px;height:6px;background:#f85149;display:inline-block;border-radius:2px 2px 0 0" title="2025-12: -4.0%"></div><div style="width:4px;height:29px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2026-01: +18.7%"></div><div style="width:4px;height:24px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2026-02: +15.8%"></div><div style="width:4px;height:1px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2026-03: +0.1%"></div><div style="width:4px;height:2px;background:#3fb950;display:inline-block;border-radius:2px 2px 0 0" title="2026-04: +1.5%"></div></div>
+<div style="display:flex;justify-content:space-between;color:#8b949e;font-size:11px;margin-top:4px">
+<span>2018-10</span><span>2026-04</span></div></div>
+
+<div class="filter-bar">
+<input type="text" id="searchBox" placeholder="🔍 Search ticker or month..." oninput="filterRows()">
+</div>
+
+<h2 style="color:#58a6ff;margin-bottom:12px;font-size:18px">📋 All Trades (182)</h2>
+<table>
+<thead><tr>
+<th>Month</th><th>Ticker</th><th>Name</th>
+<th>Buy Date</th><th>Buy</th>
+<th>Exit Date</th><th>Exit</th>
+<th>P&L%</th><th>Stop Level</th><th>Exit Reason</th><th>Risk%</th><th>Trend</th>
+</tr></thead><tbody>
+<tr data-ticker="2319.hk" data-month="2018-10">
+<td>2018-10</td><td>2319.HK</td><td>China Mengniu</td>
+<td>2018-10-02</td><td>26.05</td>
+<td>2018-10-08</td><td>23.44</td>
+<td class="red">-10.00%</td>
+<td>23.44</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>9.6%</td>
+<td>UP</td></tr><tr data-ticker="1211.hk" data-month="2018-10">
+<td>2018-10</td><td>1211.HK</td><td>BYD Company</td>
+<td>2018-10-02</td><td>18.73</td>
+<td>2018-10-10</td><td>16.86</td>
+<td class="red">-10.00%</td>
+<td>16.86</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>7.1%</td>
+<td>UP</td></tr><tr data-ticker="0267.hk" data-month="2018-11">
+<td>2018-11</td><td>0267.HK</td><td>CITIC</td>
+<td>2018-11-01</td><td>11.46</td>
+<td>2018-11-30</td><td>12.56</td>
+<td class="green">+9.60%</td>
+<td>11.10</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>6.0%</td>
+<td>UP</td></tr><tr data-ticker="1177.hk" data-month="2018-11">
+<td>2018-11</td><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2018-11-01</td><td>4.75</td>
+<td>2018-11-30</td><td>4.76</td>
+<td class="green">+0.14%</td>
+<td>4.28</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>15.6%</td>
+<td>SIDEWAYS</td></tr><tr data-ticker="0027.hk" data-month="2018-12">
+<td>2018-12</td><td>0027.HK</td><td>Galaxy Entertainment</td>
+<td>2018-12-03</td><td>50.90</td>
+<td>2018-12-31</td><td>49.80</td>
+<td class="red">-2.16%</td>
+<td>46.48</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>12.0%</td>
+<td>UP</td></tr><tr data-ticker="2331.hk" data-month="2018-12">
+<td>2018-12</td><td>2331.HK</td><td>Li Ning</td>
+<td>2018-12-03</td><td>8.51</td>
+<td>2018-12-31</td><td>8.40</td>
+<td class="red">-1.29%</td>
+<td>7.66</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>11.7%</td>
+<td>UP</td></tr><tr data-ticker="0316.hk" data-month="2019-01">
+<td>2019-01</td><td>0316.HK</td><td>Orient Overseas</td>
+<td>2019-01-02</td><td>52.45</td>
+<td>2019-01-31</td><td>51.90</td>
+<td class="red">-1.05%</td>
+<td>48.64</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>6.8%</td>
+<td>UP</td></tr><tr data-ticker="0003.hk" data-month="2019-01">
+<td>2019-01</td><td>0003.HK</td><td>HK & China Gas</td>
+<td>2019-01-02</td><td>13.44</td>
+<td>2019-01-31</td><td>14.03</td>
+<td class="green">+4.42%</td>
+<td>12.96</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>3.3%</td>
+<td>UP</td></tr><tr data-ticker="0241.hk" data-month="2019-02">
+<td>2019-02</td><td>0241.HK</td><td>Ali Health</td>
+<td>2019-02-01</td><td>7.23</td>
+<td>2019-02-28</td><td>8.05</td>
+<td class="green">+11.34%</td>
+<td>6.53</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>9.3%</td>
+<td>UP</td></tr><tr data-ticker="0027.hk" data-month="2019-02">
+<td>2019-02</td><td>0027.HK</td><td>Galaxy Entertainment</td>
+<td>2019-02-01</td><td>54.40</td>
+<td>2019-02-28</td><td>55.75</td>
+<td class="green">+2.48%</td>
+<td>50.01</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>9.2%</td>
+<td>UP</td></tr><tr data-ticker="2269.hk" data-month="2019-03">
+<td>2019-03</td><td>2269.HK</td><td>WuXi Biologics</td>
+<td>2019-03-01</td><td>24.60</td>
+<td>2019-03-29</td><td>25.45</td>
+<td class="green">+3.46%</td>
+<td>23.24</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.4%</td>
+<td>UP</td></tr><tr data-ticker="2020.hk" data-month="2019-03">
+<td>2019-03</td><td>2020.HK</td><td>ANTA Sports</td>
+<td>2019-03-01</td><td>45.00</td>
+<td>2019-03-29</td><td>53.40</td>
+<td class="green">+18.67%</td>
+<td>42.24</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>9.8%</td>
+<td>UP</td></tr><tr data-ticker="0881.hk" data-month="2019-04">
+<td>2019-04</td><td>0881.HK</td><td>Zhongsheng Group</td>
+<td>2019-04-01</td><td>19.80</td>
+<td>2019-04-30</td><td>20.60</td>
+<td class="green">+4.04%</td>
+<td>18.26</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.9%</td>
+<td>UP</td></tr><tr data-ticker="0288.hk" data-month="2019-04">
+<td>2019-04</td><td>0288.HK</td><td>WH Group</td>
+<td>2019-04-01</td><td>8.40</td>
+<td>2019-04-30</td><td>9.30</td>
+<td class="green">+10.71%</td>
+<td>7.78</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.5%</td>
+<td>UP</td></tr><tr data-ticker="0291.hk" data-month="2019-05">
+<td>2019-05</td><td>0291.HK</td><td>China Resources Beer</td>
+<td>2019-05-02</td><td>35.40</td>
+<td>2019-05-14</td><td>33.47</td>
+<td class="red">-5.44%</td>
+<td>33.47</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>10.3%</td>
+<td>UP</td></tr><tr data-ticker="0968.hk" data-month="2019-05">
+<td>2019-05</td><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2019-05-02</td><td>4.41</td>
+<td>2019-05-06</td><td>4.07</td>
+<td class="red">-7.73%</td>
+<td>4.07</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>9.4%</td>
+<td>UP</td></tr><tr data-ticker="0968.hk" data-month="2019-06">
+<td>2019-06</td><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2019-06-03</td><td>4.22</td>
+<td>2019-06-06</td><td>3.84</td>
+<td class="red">-8.96%</td>
+<td>3.84</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>13.1%</td>
+<td>UP</td></tr><tr data-ticker="6098.hk" data-month="2019-06">
+<td>2019-06</td><td>6098.HK</td><td>CG Services</td>
+<td>2019-06-03</td><td>16.24</td>
+<td>2019-06-28</td><td>18.06</td>
+<td class="green">+11.21%</td>
+<td>14.68</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>9.5%</td>
+<td>UP</td></tr><tr data-ticker="2331.hk" data-month="2019-07">
+<td>2019-07</td><td>2331.HK</td><td>Li Ning</td>
+<td>2019-07-02</td><td>18.70</td>
+<td>2019-07-31</td><td>19.46</td>
+<td class="green">+4.06%</td>
+<td>16.83</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.0%</td>
+<td>UP</td></tr><tr data-ticker="0881.hk" data-month="2019-07">
+<td>2019-07</td><td>0881.HK</td><td>Zhongsheng Group</td>
+<td>2019-07-02</td><td>22.00</td>
+<td>2019-07-15</td><td>20.27</td>
+<td class="red">-7.86%</td>
+<td>20.27</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>8.9%</td>
+<td>UP</td></tr><tr data-ticker="1177.hk" data-month="2019-08">
+<td>2019-08</td><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2019-08-01</td><td>6.35</td>
+<td>2019-08-05</td><td>5.91</td>
+<td class="red">-6.91%</td>
+<td>5.91</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>7.7%</td>
+<td>UP</td></tr><tr data-ticker="0968.hk" data-month="2019-08">
+<td>2019-08</td><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2019-08-01</td><td>4.28</td>
+<td>2019-08-06</td><td>3.94</td>
+<td class="red">-7.90%</td>
+<td>3.94</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>7.7%</td>
+<td>UP</td></tr><tr data-ticker="0968.hk" data-month="2019-09">
+<td>2019-09</td><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2019-09-02</td><td>5.10</td>
+<td>2019-09-30</td><td>4.70</td>
+<td class="red">-7.84%</td>
+<td>4.59</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>12.0%</td>
+<td>UP</td></tr><tr data-ticker="2331.hk" data-month="2019-09">
+<td>2019-09</td><td>2331.HK</td><td>Li Ning</td>
+<td>2019-09-02</td><td>23.90</td>
+<td>2019-09-11</td><td>21.51</td>
+<td class="red">-10.00%</td>
+<td>21.51</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>12.0%</td>
+<td>UP</td></tr><tr data-ticker="3690.hk" data-month="2019-10">
+<td>2019-10</td><td>3690.HK</td><td>Meituan</td>
+<td>2019-10-02</td><td>79.55</td>
+<td>2019-10-31</td><td>93.65</td>
+<td class="green">+17.72%</td>
+<td>74.95</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>8.0%</td>
+<td>UP</td></tr><tr data-ticker="2020.hk" data-month="2019-10">
+<td>2019-10</td><td>2020.HK</td><td>ANTA Sports</td>
+<td>2019-10-02</td><td>64.50</td>
+<td>2019-10-31</td><td>76.80</td>
+<td class="green">+19.07%</td>
+<td>60.20</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>7.1%</td>
+<td>UP</td></tr><tr data-ticker="2018.hk" data-month="2019-11">
+<td>2019-11</td><td>2018.HK</td><td>AAC Technologies</td>
+<td>2019-11-01</td><td>51.00</td>
+<td>2019-11-29</td><td>54.90</td>
+<td class="green">+7.65%</td>
+<td>46.24</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.2%</td>
+<td>UP</td></tr><tr data-ticker="1177.hk" data-month="2019-11">
+<td>2019-11</td><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2019-11-01</td><td>7.81</td>
+<td>2019-11-27</td><td>7.10</td>
+<td class="red">-9.08%</td>
+<td>7.10</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>9.1%</td>
+<td>UP</td></tr><tr data-ticker="0968.hk" data-month="2019-12">
+<td>2019-12</td><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2019-12-02</td><td>4.88</td>
+<td>2019-12-31</td><td>5.53</td>
+<td class="green">+13.32%</td>
+<td>4.65</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>9.5%</td>
+<td>UP</td></tr><tr data-ticker="3690.hk" data-month="2019-12">
+<td>2019-12</td><td>3690.HK</td><td>Meituan</td>
+<td>2019-12-02</td><td>104.00</td>
+<td>2019-12-31</td><td>101.90</td>
+<td class="red">-2.02%</td>
+<td>95.25</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>9.0%</td>
+<td>UP</td></tr><tr data-ticker="2018.hk" data-month="2020-01">
+<td>2020-01</td><td>2018.HK</td><td>AAC Technologies</td>
+<td>2020-01-02</td><td>68.30</td>
+<td>2020-01-08</td><td>62.81</td>
+<td class="red">-8.04%</td>
+<td>62.81</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>10.3%</td>
+<td>UP</td></tr><tr data-ticker="0968.hk" data-month="2020-01">
+<td>2020-01</td><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2020-01-02</td><td>5.52</td>
+<td>2020-01-07</td><td>5.29</td>
+<td class="red">-4.22%</td>
+<td>5.29</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>7.9%</td>
+<td>UP</td></tr><tr data-ticker="2688.hk" data-month="2020-02">
+<td>2020-02</td><td>2688.HK</td><td>ENN Energy</td>
+<td>2020-02-03</td><td>89.10</td>
+<td>2020-02-05</td><td>88.68</td>
+<td class="red">-0.47%</td>
+<td>88.68</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>3.3%</td>
+<td>UP</td></tr><tr data-ticker="0241.hk" data-month="2020-02">
+<td>2020-02</td><td>0241.HK</td><td>Ali Health</td>
+<td>2020-02-03</td><td>10.78</td>
+<td>2020-02-28</td><td>14.94</td>
+<td class="green">+38.59%</td>
+<td>10.29</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>1.8%</td>
+<td>UP</td></tr><tr data-ticker="0241.hk" data-month="2020-03">
+<td>2020-03</td><td>0241.HK</td><td>Ali Health</td>
+<td>2020-03-02</td><td>14.76</td>
+<td>2020-03-12</td><td>13.28</td>
+<td class="red">-10.00%</td>
+<td>13.28</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>9.8%</td>
+<td>UP</td></tr><tr data-ticker="1810.hk" data-month="2020-03">
+<td>2020-03</td><td>1810.HK</td><td>Xiaomi</td>
+<td>2020-03-02</td><td>12.56</td>
+<td>2020-03-10</td><td>11.94</td>
+<td class="red">-4.97%</td>
+<td>11.94</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>7.8%</td>
+<td>UP</td></tr><tr data-ticker="0960.hk" data-month="2020-04">
+<td>2020-04</td><td>0960.HK</td><td>Longfor Group</td>
+<td>2020-04-01</td><td>36.35</td>
+<td>2020-04-29</td><td>39.25</td>
+<td class="green">+7.98%</td>
+<td>32.71</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>14.9%</td>
+<td>SIDEWAYS</td></tr><tr data-ticker="6098.hk" data-month="2020-04">
+<td>2020-04</td><td>6098.HK</td><td>CG Services</td>
+<td>2020-04-01</td><td>31.50</td>
+<td>2020-04-29</td><td>36.00</td>
+<td class="green">+14.29%</td>
+<td>28.35</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>14.4%</td>
+<td>SIDEWAYS</td></tr><tr data-ticker="0981.hk" data-month="2020-05">
+<td>2020-05</td><td>0981.HK</td><td>SMIC</td>
+<td>2020-05-04</td><td>14.30</td>
+<td>2020-05-29</td><td>16.84</td>
+<td class="green">+17.76%</td>
+<td>13.42</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>11.7%</td>
+<td>UP</td></tr><tr data-ticker="0291.hk" data-month="2020-05">
+<td>2020-05</td><td>0291.HK</td><td>China Resources Beer</td>
+<td>2020-05-04</td><td>36.20</td>
+<td>2020-05-29</td><td>41.05</td>
+<td class="green">+13.40%</td>
+<td>33.34</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>11.1%</td>
+<td>UP</td></tr><tr data-ticker="0968.hk" data-month="2020-06">
+<td>2020-06</td><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2020-06-01</td><td>5.75</td>
+<td>2020-06-30</td><td>7.34</td>
+<td class="green">+27.65%</td>
+<td>5.17</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>12.4%</td>
+<td>UP</td></tr><tr data-ticker="6862.hk" data-month="2020-06">
+<td>2020-06</td><td>6862.HK</td><td>Haidilao</td>
+<td>2020-06-01</td><td>37.10</td>
+<td>2020-06-15</td><td>33.74</td>
+<td class="red">-9.06%</td>
+<td>33.74</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>12.3%</td>
+<td>UP</td></tr><tr data-ticker="3690.hk" data-month="2020-07">
+<td>2020-07</td><td>3690.HK</td><td>Meituan</td>
+<td>2020-07-02</td><td>176.50</td>
+<td>2020-07-31</td><td>191.90</td>
+<td class="green">+8.73%</td>
+<td>158.85</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>11.6%</td>
+<td>UP</td></tr><tr data-ticker="0017.hk" data-month="2020-07">
+<td>2020-07</td><td>0017.HK</td><td>New World Dev</td>
+<td>2020-07-02</td><td>39.00</td>
+<td>2020-07-31</td><td>37.80</td>
+<td class="red">-3.08%</td>
+<td>35.21</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>11.1%</td>
+<td>UP</td></tr><tr data-ticker="2018.hk" data-month="2020-08">
+<td>2020-08</td><td>2018.HK</td><td>AAC Technologies</td>
+<td>2020-08-03</td><td>63.00</td>
+<td>2020-08-12</td><td>56.70</td>
+<td class="red">-10.00%</td>
+<td>56.70</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>13.3%</td>
+<td>UP</td></tr><tr data-ticker="2269.hk" data-month="2020-08">
+<td>2020-08</td><td>2269.HK</td><td>WuXi Biologics</td>
+<td>2020-08-03</td><td>54.33</td>
+<td>2020-08-31</td><td>67.13</td>
+<td class="green">+23.56%</td>
+<td>48.90</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>11.4%</td>
+<td>UP</td></tr><tr data-ticker="3690.hk" data-month="2020-09">
+<td>2020-09</td><td>3690.HK</td><td>Meituan</td>
+<td>2020-09-01</td><td>256.20</td>
+<td>2020-09-08</td><td>232.75</td>
+<td class="red">-9.15%</td>
+<td>232.75</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>12.0%</td>
+<td>UP</td></tr><tr data-ticker="0968.hk" data-month="2020-09">
+<td>2020-09</td><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2020-09-01</td><td>9.95</td>
+<td>2020-09-09</td><td>8.95</td>
+<td class="red">-10.00%</td>
+<td>8.95</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>11.5%</td>
+<td>UP</td></tr><tr data-ticker="2331.hk" data-month="2020-10">
+<td>2020-10</td><td>2331.HK</td><td>Li Ning</td>
+<td>2020-10-05</td><td>36.25</td>
+<td>2020-10-30</td><td>40.00</td>
+<td class="green">+10.34%</td>
+<td>33.86</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>12.6%</td>
+<td>UP</td></tr><tr data-ticker="2269.hk" data-month="2020-10">
+<td>2020-10</td><td>2269.HK</td><td>WuXi Biologics</td>
+<td>2020-10-05</td><td>65.27</td>
+<td>2020-10-30</td><td>72.20</td>
+<td class="green">+10.62%</td>
+<td>58.74</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.5%</td>
+<td>UP</td></tr><tr data-ticker="1378.hk" data-month="2020-11">
+<td>2020-11</td><td>1378.HK</td><td>China Hongqiao</td>
+<td>2020-11-02</td><td>5.71</td>
+<td>2020-11-30</td><td>6.77</td>
+<td class="green">+18.56%</td>
+<td>5.16</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.6%</td>
+<td>UP</td></tr><tr data-ticker="2382.hk" data-month="2020-11">
+<td>2020-11</td><td>2382.HK</td><td>Sunny Optical</td>
+<td>2020-11-02</td><td>130.00</td>
+<td>2020-11-30</td><td>152.40</td>
+<td class="green">+17.23%</td>
+<td>119.92</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>8.3%</td>
+<td>UP</td></tr><tr data-ticker="0968.hk" data-month="2020-12">
+<td>2020-12</td><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2020-12-01</td><td>14.22</td>
+<td>2020-12-07</td><td>12.80</td>
+<td class="red">-10.00%</td>
+<td>12.80</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>11.0%</td>
+<td>UP</td></tr><tr data-ticker="0868.hk" data-month="2020-12">
+<td>2020-12</td><td>0868.HK</td><td>Xinyi Glass</td>
+<td>2020-12-01</td><td>17.40</td>
+<td>2020-12-31</td><td>21.65</td>
+<td class="green">+24.43%</td>
+<td>16.05</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>9.7%</td>
+<td>UP</td></tr><tr data-ticker="0968.hk" data-month="2021-01">
+<td>2021-01</td><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2021-01-04</td><td>20.05</td>
+<td>2021-01-27</td><td>18.04</td>
+<td class="red">-10.00%</td>
+<td>18.04</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>13.4%</td>
+<td>UP</td></tr><tr data-ticker="0291.hk" data-month="2021-01">
+<td>2021-01</td><td>0291.HK</td><td>China Resources Beer</td>
+<td>2021-01-04</td><td>69.15</td>
+<td>2021-01-14</td><td>66.18</td>
+<td class="red">-4.30%</td>
+<td>66.18</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>10.6%</td>
+<td>UP</td></tr><tr data-ticker="3690.hk" data-month="2021-02">
+<td>2021-02</td><td>3690.HK</td><td>Meituan</td>
+<td>2021-02-01</td><td>369.00</td>
+<td>2021-02-26</td><td>347.27</td>
+<td class="red">-5.89%</td>
+<td>347.27</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>11.2%</td>
+<td>UP</td></tr><tr data-ticker="6862.hk" data-month="2021-02">
+<td>2021-02</td><td>6862.HK</td><td>Haidilao</td>
+<td>2021-02-01</td><td>66.50</td>
+<td>2021-02-26</td><td>63.65</td>
+<td class="red">-4.29%</td>
+<td>61.66</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>10.8%</td>
+<td>UP</td></tr><tr data-ticker="1378.hk" data-month="2021-03">
+<td>2021-03</td><td>1378.HK</td><td>China Hongqiao</td>
+<td>2021-03-01</td><td>9.62</td>
+<td>2021-03-31</td><td>10.38</td>
+<td class="green">+7.90%</td>
+<td>8.77</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>11.7%</td>
+<td>UP</td></tr><tr data-ticker="0241.hk" data-month="2021-03">
+<td>2021-03</td><td>0241.HK</td><td>Ali Health</td>
+<td>2021-03-01</td><td>27.95</td>
+<td>2021-03-05</td><td>25.16</td>
+<td class="red">-9.97%</td>
+<td>25.16</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>11.6%</td>
+<td>UP</td></tr><tr data-ticker="0868.hk" data-month="2021-04">
+<td>2021-04</td><td>0868.HK</td><td>Xinyi Glass</td>
+<td>2021-04-01</td><td>25.40</td>
+<td>2021-04-30</td><td>27.55</td>
+<td class="green">+8.46%</td>
+<td>22.86</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>11.7%</td>
+<td>UP</td></tr><tr data-ticker="0669.hk" data-month="2021-04">
+<td>2021-04</td><td>0669.HK</td><td>Techtronic Ind</td>
+<td>2021-04-01</td><td>134.20</td>
+<td>2021-04-30</td><td>141.60</td>
+<td class="green">+5.51%</td>
+<td>120.78</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>11.3%</td>
+<td>UP</td></tr><tr data-ticker="1378.hk" data-month="2021-05">
+<td>2021-05</td><td>1378.HK</td><td>China Hongqiao</td>
+<td>2021-05-03</td><td>12.20</td>
+<td>2021-05-20</td><td>10.98</td>
+<td class="red">-10.00%</td>
+<td>10.98</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>11.3%</td>
+<td>UP</td></tr><tr data-ticker="2331.hk" data-month="2021-05">
+<td>2021-05</td><td>2331.HK</td><td>Li Ning</td>
+<td>2021-05-03</td><td>62.95</td>
+<td>2021-05-31</td><td>72.85</td>
+<td class="green">+15.73%</td>
+<td>57.92</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>9.5%</td>
+<td>UP</td></tr><tr data-ticker="2269.hk" data-month="2021-06">
+<td>2021-06</td><td>2269.HK</td><td>WuXi Biologics</td>
+<td>2021-06-01</td><td>120.40</td>
+<td>2021-06-30</td><td>142.30</td>
+<td class="green">+18.19%</td>
+<td>109.53</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>12.2%</td>
+<td>UP</td></tr><tr data-ticker="2331.hk" data-month="2021-06">
+<td>2021-06</td><td>2331.HK</td><td>Li Ning</td>
+<td>2021-06-01</td><td>73.00</td>
+<td>2021-06-30</td><td>94.80</td>
+<td class="green">+29.86%</td>
+<td>66.69</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.8%</td>
+<td>UP</td></tr><tr data-ticker="0316.hk" data-month="2021-07">
+<td>2021-07</td><td>0316.HK</td><td>Orient Overseas</td>
+<td>2021-07-02</td><td>168.80</td>
+<td>2021-07-14</td><td>151.92</td>
+<td class="red">-10.00%</td>
+<td>151.92</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>12.3%</td>
+<td>UP</td></tr><tr data-ticker="2382.hk" data-month="2021-07">
+<td>2021-07</td><td>2382.HK</td><td>Sunny Optical</td>
+<td>2021-07-02</td><td>242.00</td>
+<td>2021-07-12</td><td>218.08</td>
+<td class="red">-9.89%</td>
+<td>218.08</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>7.8%</td>
+<td>UP</td></tr><tr data-ticker="2382.hk" data-month="2021-08">
+<td>2021-08</td><td>2382.HK</td><td>Sunny Optical</td>
+<td>2021-08-02</td><td>232.80</td>
+<td>2021-08-16</td><td>209.52</td>
+<td class="red">-10.00%</td>
+<td>209.52</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>12.5%</td>
+<td>UP</td></tr><tr data-ticker="2688.hk" data-month="2021-08">
+<td>2021-08</td><td>2688.HK</td><td>ENN Energy</td>
+<td>2021-08-02</td><td>163.30</td>
+<td>2021-08-24</td><td>154.42</td>
+<td class="red">-5.44%</td>
+<td>154.42</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>7.7%</td>
+<td>UP</td></tr><tr data-ticker="2331.hk" data-month="2021-09">
+<td>2021-09</td><td>2331.HK</td><td>Li Ning</td>
+<td>2021-09-01</td><td>105.00</td>
+<td>2021-09-21</td><td>94.50</td>
+<td class="red">-10.00%</td>
+<td>94.50</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>14.3%</td>
+<td>UP</td></tr><tr data-ticker="0316.hk" data-month="2021-09">
+<td>2021-09</td><td>0316.HK</td><td>Orient Overseas</td>
+<td>2021-09-01</td><td>200.40</td>
+<td>2021-09-02</td><td>180.36</td>
+<td class="red">-10.00%</td>
+<td>180.36</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>13.1%</td>
+<td>UP</td></tr><tr data-ticker="1109.hk" data-month="2021-10">
+<td>2021-10</td><td>1109.HK</td><td>China Resources Land</td>
+<td>2021-10-04</td><td>31.70</td>
+<td>2021-10-29</td><td>30.30</td>
+<td class="red">-4.42%</td>
+<td>28.53</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>13.6%</td>
+<td>UP</td></tr><tr data-ticker="0883.hk" data-month="2021-10">
+<td>2021-10</td><td>0883.HK</td><td>CNOOC</td>
+<td>2021-10-04</td><td>8.79</td>
+<td>2021-10-29</td><td>8.58</td>
+<td class="red">-2.39%</td>
+<td>8.19</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>6.3%</td>
+<td>UP</td></tr><tr data-ticker="1024.hk" data-month="2021-11">
+<td>2021-11</td><td>1024.HK</td><td>Kuaishou Tech</td>
+<td>2021-11-01</td><td>103.60</td>
+<td>2021-11-03</td><td>93.24</td>
+<td class="red">-10.00%</td>
+<td>93.24</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>8.6%</td>
+<td>UP</td></tr><tr data-ticker="0322.hk" data-month="2021-11">
+<td>2021-11</td><td>0322.HK</td><td>TCL Electronics</td>
+<td>2021-11-01</td><td>14.56</td>
+<td>2021-11-30</td><td>15.10</td>
+<td class="green">+3.71%</td>
+<td>13.80</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>8.1%</td>
+<td>UP</td></tr><tr data-ticker="0316.hk" data-month="2021-12">
+<td>2021-12</td><td>0316.HK</td><td>Orient Overseas</td>
+<td>2021-12-01</td><td>149.10</td>
+<td>2021-12-31</td><td>191.30</td>
+<td class="green">+28.30%</td>
+<td>134.19</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.6%</td>
+<td>UP</td></tr><tr data-ticker="2382.hk" data-month="2021-12">
+<td>2021-12</td><td>2382.HK</td><td>Sunny Optical</td>
+<td>2021-12-01</td><td>239.60</td>
+<td>2021-12-31</td><td>246.60</td>
+<td class="green">+2.92%</td>
+<td>215.64</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>7.5%</td>
+<td>UP</td></tr><tr data-ticker="1378.hk" data-month="2022-01">
+<td>2022-01</td><td>1378.HK</td><td>China Hongqiao</td>
+<td>2022-01-03</td><td>8.23</td>
+<td>2022-01-31</td><td>8.71</td>
+<td class="green">+5.83%</td>
+<td>7.59</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.4%</td>
+<td>UP</td></tr><tr data-ticker="2688.hk" data-month="2022-01">
+<td>2022-01</td><td>2688.HK</td><td>ENN Energy</td>
+<td>2022-01-03</td><td>146.80</td>
+<td>2022-01-06</td><td>136.94</td>
+<td class="red">-6.72%</td>
+<td>136.94</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>9.2%</td>
+<td>UP</td></tr><tr data-ticker="1024.hk" data-month="2022-02">
+<td>2022-02</td><td>1024.HK</td><td>Kuaishou Tech</td>
+<td>2022-02-04</td><td>88.80</td>
+<td>2022-02-28</td><td>89.55</td>
+<td class="green">+0.84%</td>
+<td>79.92</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>15.3%</td>
+<td>UP</td></tr><tr data-ticker="1928.hk" data-month="2022-02">
+<td>2022-02</td><td>1928.HK</td><td>Sands China</td>
+<td>2022-02-04</td><td>22.20</td>
+<td>2022-02-28</td><td>20.45</td>
+<td class="red">-7.88%</td>
+<td>19.98</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>11.4%</td>
+<td>UP</td></tr><tr data-ticker="0316.hk" data-month="2022-03">
+<td>2022-03</td><td>0316.HK</td><td>Orient Overseas</td>
+<td>2022-03-01</td><td>221.40</td>
+<td>2022-03-15</td><td>199.26</td>
+<td class="red">-10.00%</td>
+<td>199.26</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>10.8%</td>
+<td>UP</td></tr><tr data-ticker="1378.hk" data-month="2022-03">
+<td>2022-03</td><td>1378.HK</td><td>China Hongqiao</td>
+<td>2022-03-01</td><td>10.72</td>
+<td>2022-03-09</td><td>9.68</td>
+<td class="red">-9.69%</td>
+<td>9.68</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>8.5%</td>
+<td>UP</td></tr><tr data-ticker="0883.hk" data-month="2022-04">
+<td>2022-04</td><td>0883.HK</td><td>CNOOC</td>
+<td>2022-04-01</td><td>10.56</td>
+<td>2022-04-26</td><td>9.93</td>
+<td class="red">-5.97%</td>
+<td>9.93</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>9.2%</td>
+<td>UP</td></tr><tr data-ticker="1113.hk" data-month="2022-04">
+<td>2022-04</td><td>1113.HK</td><td>CK Asset Holdings</td>
+<td>2022-04-01</td><td>54.05</td>
+<td>2022-04-29</td><td>53.40</td>
+<td class="red">-1.20%</td>
+<td>50.60</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>7.3%</td>
+<td>UP</td></tr><tr data-ticker="1211.hk" data-month="2022-05">
+<td>2022-05</td><td>1211.HK</td><td>BYD Company</td>
+<td>2022-05-03</td><td>75.67</td>
+<td>2022-05-10</td><td>69.53</td>
+<td class="red">-8.11%</td>
+<td>69.53</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>11.2%</td>
+<td>UP</td></tr><tr data-ticker="9999.hk" data-month="2022-05">
+<td>2022-05</td><td>9999.HK</td><td>NetEase</td>
+<td>2022-05-03</td><td>150.00</td>
+<td>2022-05-10</td><td>135.00</td>
+<td class="red">-10.00%</td>
+<td>135.00</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>10.8%</td>
+<td>UP</td></tr><tr data-ticker="1211.hk" data-month="2022-06">
+<td>2022-06</td><td>1211.HK</td><td>BYD Company</td>
+<td>2022-06-01</td><td>93.33</td>
+<td>2022-06-30</td><td>104.67</td>
+<td class="green">+12.14%</td>
+<td>84.00</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>11.1%</td>
+<td>UP</td></tr><tr data-ticker="0316.hk" data-month="2022-06">
+<td>2022-06</td><td>0316.HK</td><td>Orient Overseas</td>
+<td>2022-06-01</td><td>243.80</td>
+<td>2022-06-13</td><td>228.26</td>
+<td class="red">-6.38%</td>
+<td>228.26</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>10.5%</td>
+<td>UP</td></tr><tr data-ticker="0241.hk" data-month="2022-07">
+<td>2022-07</td><td>0241.HK</td><td>Ali Health</td>
+<td>2022-07-04</td><td>5.32</td>
+<td>2022-07-29</td><td>4.79</td>
+<td class="red">-10.00%</td>
+<td>4.79</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>14.8%</td>
+<td>UP</td></tr><tr data-ticker="2269.hk" data-month="2022-07">
+<td>2022-07</td><td>2269.HK</td><td>WuXi Biologics</td>
+<td>2022-07-04</td><td>70.80</td>
+<td>2022-07-29</td><td>74.55</td>
+<td class="green">+5.30%</td>
+<td>66.26</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>14.6%</td>
+<td>UP</td></tr><tr data-ticker="1928.hk" data-month="2022-08">
+<td>2022-08</td><td>1928.HK</td><td>Sands China</td>
+<td>2022-08-01</td><td>18.76</td>
+<td>2022-08-18</td><td>16.88</td>
+<td class="red">-10.00%</td>
+<td>16.88</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>8.9%</td>
+<td>UP</td></tr><tr data-ticker="0316.hk" data-month="2022-08">
+<td>2022-08</td><td>0316.HK</td><td>Orient Overseas</td>
+<td>2022-08-01</td><td>279.00</td>
+<td>2022-08-04</td><td>251.10</td>
+<td class="red">-10.00%</td>
+<td>251.10</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>8.2%</td>
+<td>UP</td></tr><tr data-ticker="6862.hk" data-month="2022-09">
+<td>2022-09</td><td>6862.HK</td><td>Haidilao</td>
+<td>2022-09-01</td><td>18.60</td>
+<td>2022-09-07</td><td>16.74</td>
+<td class="red">-10.00%</td>
+<td>16.74</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>8.7%</td>
+<td>UP</td></tr><tr data-ticker="2331.hk" data-month="2022-09">
+<td>2022-09</td><td>2331.HK</td><td>Li Ning</td>
+<td>2022-09-01</td><td>71.00</td>
+<td>2022-09-19</td><td>63.90</td>
+<td class="red">-10.00%</td>
+<td>63.90</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>8.1%</td>
+<td>UP</td></tr><tr data-ticker="1928.hk" data-month="2022-10">
+<td>2022-10</td><td>1928.HK</td><td>Sands China</td>
+<td>2022-10-03</td><td>19.56</td>
+<td>2022-10-12</td><td>18.45</td>
+<td class="red">-5.69%</td>
+<td>18.45</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>7.6%</td>
+<td>UP</td></tr><tr data-ticker="0019.hk" data-month="2022-10">
+<td>2022-10</td><td>0019.HK</td><td>Swire Pacific</td>
+<td>2022-10-03</td><td>58.90</td>
+<td>2022-10-14</td><td>56.02</td>
+<td class="red">-4.89%</td>
+<td>56.02</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>4.2%</td>
+<td>UP</td></tr><tr data-ticker="1093.hk" data-month="2022-11">
+<td>2022-11</td><td>1093.HK</td><td>CSPC Pharmaceutical</td>
+<td>2022-11-01</td><td>8.44</td>
+<td>2022-11-30</td><td>9.99</td>
+<td class="green">+18.36%</td>
+<td>7.77</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>11.7%</td>
+<td>UP</td></tr><tr data-ticker="1177.hk" data-month="2022-11">
+<td>2022-11</td><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2022-11-01</td><td>3.86</td>
+<td>2022-11-30</td><td>4.58</td>
+<td class="green">+18.65%</td>
+<td>3.72</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>11.3%</td>
+<td>UP</td></tr><tr data-ticker="6098.hk" data-month="2022-12">
+<td>2022-12</td><td>6098.HK</td><td>CG Services</td>
+<td>2022-12-01</td><td>19.86</td>
+<td>2022-12-15</td><td>17.87</td>
+<td class="red">-10.00%</td>
+<td>17.87</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>23.1%</td>
+<td>UP</td></tr><tr data-ticker="2007.hk" data-month="2022-12">
+<td>2022-12</td><td>2007.HK</td><td>Country Garden</td>
+<td>2022-12-01</td><td>3.08</td>
+<td>2022-12-02</td><td>2.77</td>
+<td class="red">-10.00%</td>
+<td>2.77</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>15.6%</td>
+<td>UP</td></tr><tr data-ticker="1024.hk" data-month="2023-01">
+<td>2023-01</td><td>1024.HK</td><td>Kuaishou Tech</td>
+<td>2023-01-03</td><td>70.75</td>
+<td>2023-01-31</td><td>68.65</td>
+<td class="red">-2.97%</td>
+<td>63.68</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>16.3%</td>
+<td>UP</td></tr><tr data-ticker="6862.hk" data-month="2023-01">
+<td>2023-01</td><td>6862.HK</td><td>Haidilao</td>
+<td>2023-01-03</td><td>22.40</td>
+<td>2023-01-31</td><td>21.25</td>
+<td class="red">-5.13%</td>
+<td>20.16</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>15.8%</td>
+<td>UP</td></tr><tr data-ticker="6098.hk" data-month="2023-02">
+<td>2023-02</td><td>6098.HK</td><td>CG Services</td>
+<td>2023-02-01</td><td>21.55</td>
+<td>2023-02-03</td><td>19.39</td>
+<td class="red">-10.00%</td>
+<td>19.39</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>14.2%</td>
+<td>UP</td></tr><tr data-ticker="9888.hk" data-month="2023-02">
+<td>2023-02</td><td>9888.HK</td><td>Baidu</td>
+<td>2023-02-01</td><td>133.00</td>
+<td>2023-02-28</td><td>134.80</td>
+<td class="green">+1.35%</td>
+<td>126.03</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>12.7%</td>
+<td>UP</td></tr><tr data-ticker="9961.hk" data-month="2023-03">
+<td>2023-03</td><td>9961.HK</td><td>Trip.com</td>
+<td>2023-03-01</td><td>277.60</td>
+<td>2023-03-31</td><td>293.80</td>
+<td class="green">+5.84%</td>
+<td>272.32</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>6.7%</td>
+<td>UP</td></tr><tr data-ticker="9633.hk" data-month="2023-03">
+<td>2023-03</td><td>9633.HK</td><td>Nongfu Spring</td>
+<td>2023-03-01</td><td>43.60</td>
+<td>2023-03-31</td><td>45.15</td>
+<td class="green">+3.56%</td>
+<td>42.42</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>4.6%</td>
+<td>UP</td></tr><tr data-ticker="0291.hk" data-month="2023-04">
+<td>2023-04</td><td>0291.HK</td><td>China Resources Beer</td>
+<td>2023-04-03</td><td>62.55</td>
+<td>2023-04-28</td><td>60.35</td>
+<td class="red">-3.52%</td>
+<td>58.41</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>7.7%</td>
+<td>UP</td></tr><tr data-ticker="9888.hk" data-month="2023-04">
+<td>2023-04</td><td>9888.HK</td><td>Baidu</td>
+<td>2023-04-03</td><td>146.50</td>
+<td>2023-04-11</td><td>135.98</td>
+<td class="red">-7.18%</td>
+<td>135.98</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>6.6%</td>
+<td>UP</td></tr><tr data-ticker="0386.hk" data-month="2023-05">
+<td>2023-05</td><td>0386.HK</td><td>China Petroleum</td>
+<td>2023-05-02</td><td>5.15</td>
+<td>2023-05-31</td><td>4.93</td>
+<td class="red">-4.27%</td>
+<td>4.81</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>7.1%</td>
+<td>UP</td></tr><tr data-ticker="2628.hk" data-month="2023-05">
+<td>2023-05</td><td>2628.HK</td><td>China Life</td>
+<td>2023-05-02</td><td>15.08</td>
+<td>2023-05-25</td><td>13.82</td>
+<td class="red">-8.37%</td>
+<td>13.82</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>6.6%</td>
+<td>UP</td></tr><tr data-ticker="1024.hk" data-month="2023-06">
+<td>2023-06</td><td>1024.HK</td><td>Kuaishou Tech</td>
+<td>2023-06-01</td><td>52.45</td>
+<td>2023-06-30</td><td>53.55</td>
+<td class="green">+2.10%</td>
+<td>48.62</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>9.2%</td>
+<td>SIDEWAYS</td></tr><tr data-ticker="9888.hk" data-month="2023-06">
+<td>2023-06</td><td>9888.HK</td><td>Baidu</td>
+<td>2023-06-01</td><td>120.20</td>
+<td>2023-06-30</td><td>132.80</td>
+<td class="green">+10.48%</td>
+<td>113.34</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>6.8%</td>
+<td>SIDEWAYS</td></tr><tr data-ticker="0968.hk" data-month="2023-07">
+<td>2023-07</td><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2023-07-03</td><td>8.98</td>
+<td>2023-07-07</td><td>8.54</td>
+<td class="red">-4.85%</td>
+<td>8.54</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>8.8%</td>
+<td>UP</td></tr><tr data-ticker="2313.hk" data-month="2023-07">
+<td>2023-07</td><td>2313.HK</td><td>Shenzhou International</td>
+<td>2023-07-03</td><td>75.85</td>
+<td>2023-07-31</td><td>82.05</td>
+<td class="green">+8.17%</td>
+<td>70.23</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>8.4%</td>
+<td>UP</td></tr><tr data-ticker="9888.hk" data-month="2023-08">
+<td>2023-08</td><td>9888.HK</td><td>Baidu</td>
+<td>2023-08-01</td><td>152.90</td>
+<td>2023-08-09</td><td>139.63</td>
+<td class="red">-8.68%</td>
+<td>139.63</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>8.3%</td>
+<td>UP</td></tr><tr data-ticker="0241.hk" data-month="2023-08">
+<td>2023-08</td><td>0241.HK</td><td>Ali Health</td>
+<td>2023-08-01</td><td>5.61</td>
+<td>2023-08-14</td><td>5.15</td>
+<td class="red">-8.22%</td>
+<td>5.15</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>7.7%</td>
+<td>UP</td></tr><tr data-ticker="2020.hk" data-month="2023-09">
+<td>2023-09</td><td>2020.HK</td><td>ANTA Sports</td>
+<td>2023-09-04</td><td>89.00</td>
+<td>2023-09-29</td><td>88.15</td>
+<td class="red">-0.96%</td>
+<td>81.98</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>9.5%</td>
+<td>UP</td></tr><tr data-ticker="9961.hk" data-month="2023-09">
+<td>2023-09</td><td>9961.HK</td><td>Trip.com</td>
+<td>2023-09-04</td><td>311.80</td>
+<td>2023-09-06</td><td>300.01</td>
+<td class="red">-3.78%</td>
+<td>300.01</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>9.0%</td>
+<td>UP</td></tr><tr data-ticker="2269.hk" data-month="2023-10">
+<td>2023-10</td><td>2269.HK</td><td>WuXi Biologics</td>
+<td>2023-10-03</td><td>44.50</td>
+<td>2023-10-31</td><td>48.60</td>
+<td class="green">+9.21%</td>
+<td>40.39</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>9.1%</td>
+<td>UP</td></tr><tr data-ticker="0241.hk" data-month="2023-10">
+<td>2023-10</td><td>0241.HK</td><td>Ali Health</td>
+<td>2023-10-03</td><td>4.82</td>
+<td>2023-10-24</td><td>4.34</td>
+<td class="red">-10.00%</td>
+<td>4.34</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>9.4%</td>
+<td>SIDEWAYS</td></tr><tr data-ticker="1810.hk" data-month="2023-11">
+<td>2023-11</td><td>1810.HK</td><td>Xiaomi</td>
+<td>2023-11-01</td><td>14.16</td>
+<td>2023-11-30</td><td>15.62</td>
+<td class="green">+10.31%</td>
+<td>13.01</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>8.5%</td>
+<td>UP</td></tr><tr data-ticker="2313.hk" data-month="2023-11">
+<td>2023-11</td><td>2313.HK</td><td>Shenzhou International</td>
+<td>2023-11-01</td><td>77.50</td>
+<td>2023-11-30</td><td>74.05</td>
+<td class="red">-4.45%</td>
+<td>74.05</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>6.8%</td>
+<td>UP</td></tr><tr data-ticker="2382.hk" data-month="2023-12">
+<td>2023-12</td><td>2382.HK</td><td>Sunny Optical</td>
+<td>2023-12-01</td><td>74.15</td>
+<td>2023-12-05</td><td>66.74</td>
+<td class="red">-10.00%</td>
+<td>66.74</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>8.3%</td>
+<td>UP</td></tr><tr data-ticker="1177.hk" data-month="2023-12">
+<td>2023-12</td><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2023-12-01</td><td>3.84</td>
+<td>2023-12-06</td><td>3.46</td>
+<td class="red">-10.00%</td>
+<td>3.46</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>8.1%</td>
+<td>UP</td></tr><tr data-ticker="9618.hk" data-month="2024-01">
+<td>2024-01</td><td>9618.HK</td><td>JD.com</td>
+<td>2024-01-02</td><td>113.00</td>
+<td>2024-01-08</td><td>101.70</td>
+<td class="red">-10.00%</td>
+<td>101.70</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>7.4%</td>
+<td>UP</td></tr><tr data-ticker="2018.hk" data-month="2024-01">
+<td>2024-01</td><td>2018.HK</td><td>AAC Technologies</td>
+<td>2024-01-02</td><td>23.40</td>
+<td>2024-01-05</td><td>21.06</td>
+<td class="red">-10.00%</td>
+<td>21.06</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>7.3%</td>
+<td>UP</td></tr><tr data-ticker="2688.hk" data-month="2024-02">
+<td>2024-02</td><td>2688.HK</td><td>ENN Energy</td>
+<td>2024-02-01</td><td>58.15</td>
+<td>2024-02-09</td><td>53.53</td>
+<td class="red">-7.95%</td>
+<td>53.53</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>9.6%</td>
+<td>UP</td></tr><tr data-ticker="0316.hk" data-month="2024-02">
+<td>2024-02</td><td>0316.HK</td><td>Orient Overseas</td>
+<td>2024-02-01</td><td>117.80</td>
+<td>2024-02-09</td><td>109.01</td>
+<td class="red">-7.46%</td>
+<td>109.01</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>7.4%</td>
+<td>UP</td></tr><tr data-ticker="3690.hk" data-month="2024-03">
+<td>2024-03</td><td>3690.HK</td><td>Meituan</td>
+<td>2024-03-01</td><td>79.00</td>
+<td>2024-03-28</td><td>96.80</td>
+<td class="green">+22.53%</td>
+<td>75.98</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>14.0%</td>
+<td>UP</td></tr><tr data-ticker="6862.hk" data-month="2024-03">
+<td>2024-03</td><td>6862.HK</td><td>Haidilao</td>
+<td>2024-03-01</td><td>14.34</td>
+<td>2024-03-28</td><td>17.66</td>
+<td class="green">+23.15%</td>
+<td>12.91</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.3%</td>
+<td>UP</td></tr><tr data-ticker="3690.hk" data-month="2024-04">
+<td>2024-04</td><td>3690.HK</td><td>Meituan</td>
+<td>2024-04-02</td><td>99.80</td>
+<td>2024-04-30</td><td>109.50</td>
+<td class="green">+9.72%</td>
+<td>89.82</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>14.0%</td>
+<td>UP</td></tr><tr data-ticker="0960.hk" data-month="2024-04">
+<td>2024-04</td><td>0960.HK</td><td>Longfor Group</td>
+<td>2024-04-02</td><td>11.16</td>
+<td>2024-04-05</td><td>10.04</td>
+<td class="red">-10.00%</td>
+<td>10.04</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>12.7%</td>
+<td>UP</td></tr><tr data-ticker="0881.hk" data-month="2024-05">
+<td>2024-05</td><td>0881.HK</td><td>Zhongsheng Group</td>
+<td>2024-05-02</td><td>14.38</td>
+<td>2024-05-31</td><td>14.14</td>
+<td class="red">-1.67%</td>
+<td>13.25</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>15.0%</td>
+<td>UP</td></tr><tr data-ticker="1024.hk" data-month="2024-05">
+<td>2024-05</td><td>1024.HK</td><td>Kuaishou Tech</td>
+<td>2024-05-02</td><td>55.95</td>
+<td>2024-05-31</td><td>55.45</td>
+<td class="red">-0.89%</td>
+<td>51.69</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>12.7%</td>
+<td>UP</td></tr><tr data-ticker="1378.hk" data-month="2024-06">
+<td>2024-06</td><td>1378.HK</td><td>China Hongqiao</td>
+<td>2024-06-03</td><td>12.90</td>
+<td>2024-06-13</td><td>11.64</td>
+<td class="red">-9.79%</td>
+<td>11.64</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>10.9%</td>
+<td>UP</td></tr><tr data-ticker="2382.hk" data-month="2024-06">
+<td>2024-06</td><td>2382.HK</td><td>Sunny Optical</td>
+<td>2024-06-03</td><td>43.00</td>
+<td>2024-06-28</td><td>48.25</td>
+<td class="green">+12.21%</td>
+<td>39.26</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.7%</td>
+<td>UP</td></tr><tr data-ticker="0883.hk" data-month="2024-07">
+<td>2024-07</td><td>0883.HK</td><td>CNOOC</td>
+<td>2024-07-02</td><td>23.00</td>
+<td>2024-07-17</td><td>21.21</td>
+<td class="red">-7.79%</td>
+<td>21.21</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>9.4%</td>
+<td>UP</td></tr><tr data-ticker="1398.hk" data-month="2024-07">
+<td>2024-07</td><td>1398.HK</td><td>ICBC</td>
+<td>2024-07-02</td><td>4.64</td>
+<td>2024-07-08</td><td>4.47</td>
+<td class="red">-3.67%</td>
+<td>4.47</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>5.9%</td>
+<td>UP</td></tr><tr data-ticker="1038.hk" data-month="2024-08">
+<td>2024-08</td><td>1038.HK</td><td>CKI Holdings</td>
+<td>2024-08-01</td><td>51.85</td>
+<td>2024-08-30</td><td>57.90</td>
+<td class="green">+11.67%</td>
+<td>50.07</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>6.6%</td>
+<td>UP</td></tr><tr data-ticker="0001.hk" data-month="2024-08">
+<td>2024-08</td><td>0001.HK</td><td>CK Hutchison</td>
+<td>2024-08-01</td><td>41.00</td>
+<td>2024-08-16</td><td>38.81</td>
+<td class="red">-5.35%</td>
+<td>38.81</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>5.8%</td>
+<td>UP</td></tr><tr data-ticker="6618.hk" data-month="2024-09">
+<td>2024-09</td><td>6618.HK</td><td>JD Health</td>
+<td>2024-09-02</td><td>23.55</td>
+<td>2024-09-30</td><td>35.00</td>
+<td class="green">+48.62%</td>
+<td>21.19</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>9.2%</td>
+<td>UP</td></tr><tr data-ticker="0288.hk" data-month="2024-09">
+<td>2024-09</td><td>0288.HK</td><td>WH Group</td>
+<td>2024-09-02</td><td>5.68</td>
+<td>2024-09-30</td><td>6.16</td>
+<td class="green">+8.45%</td>
+<td>5.23</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>7.6%</td>
+<td>UP</td></tr><tr data-ticker="2018.hk" data-month="2024-10">
+<td>2024-10</td><td>2018.HK</td><td>AAC Technologies</td>
+<td>2024-10-02</td><td>31.05</td>
+<td>2024-10-31</td><td>31.45</td>
+<td class="green">+1.29%</td>
+<td>28.45</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>12.3%</td>
+<td>UP</td></tr><tr data-ticker="0669.hk" data-month="2024-10">
+<td>2024-10</td><td>0669.HK</td><td>Techtronic Ind</td>
+<td>2024-10-02</td><td>112.50</td>
+<td>2024-10-08</td><td>109.91</td>
+<td class="red">-2.30%</td>
+<td>109.91</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>9.8%</td>
+<td>UP</td></tr><tr data-ticker="1810.hk" data-month="2024-11">
+<td>2024-11</td><td>1810.HK</td><td>Xiaomi</td>
+<td>2024-11-01</td><td>27.00</td>
+<td>2024-11-29</td><td>27.75</td>
+<td class="green">+2.78%</td>
+<td>24.30</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>11.6%</td>
+<td>UP</td></tr><tr data-ticker="0968.hk" data-month="2024-11">
+<td>2024-11</td><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2024-11-01</td><td>4.01</td>
+<td>2024-11-07</td><td>3.61</td>
+<td class="red">-10.00%</td>
+<td>3.61</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>6.3%</td>
+<td>UP</td></tr><tr data-ticker="2018.hk" data-month="2024-12">
+<td>2024-12</td><td>2018.HK</td><td>AAC Technologies</td>
+<td>2024-12-02</td><td>35.35</td>
+<td>2024-12-31</td><td>37.50</td>
+<td class="green">+6.08%</td>
+<td>32.13</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>12.0%</td>
+<td>UP</td></tr><tr data-ticker="1810.hk" data-month="2024-12">
+<td>2024-12</td><td>1810.HK</td><td>Xiaomi</td>
+<td>2024-12-02</td><td>28.25</td>
+<td>2024-12-31</td><td>34.65</td>
+<td class="green">+22.65%</td>
+<td>26.01</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>8.9%</td>
+<td>UP</td></tr><tr data-ticker="1810.hk" data-month="2025-01">
+<td>2025-01</td><td>1810.HK</td><td>Xiaomi</td>
+<td>2025-01-02</td><td>34.80</td>
+<td>2025-01-28</td><td>38.15</td>
+<td class="green">+9.63%</td>
+<td>31.40</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>7.6%</td>
+<td>UP</td></tr><tr data-ticker="0386.hk" data-month="2025-01">
+<td>2025-01</td><td>0386.HK</td><td>China Petroleum</td>
+<td>2025-01-02</td><td>4.44</td>
+<td>2025-01-24</td><td>4.23</td>
+<td class="red">-4.84%</td>
+<td>4.23</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>4.6%</td>
+<td>UP</td></tr><tr data-ticker="0981.hk" data-month="2025-02">
+<td>2025-02</td><td>0981.HK</td><td>SMIC</td>
+<td>2025-02-03</td><td>38.60</td>
+<td>2025-02-28</td><td>53.60</td>
+<td class="green">+38.86%</td>
+<td>36.33</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>13.3%</td>
+<td>UP</td></tr><tr data-ticker="2018.hk" data-month="2025-02">
+<td>2025-02</td><td>2018.HK</td><td>AAC Technologies</td>
+<td>2025-02-03</td><td>39.70</td>
+<td>2025-02-28</td><td>44.80</td>
+<td class="green">+12.85%</td>
+<td>36.12</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.5%</td>
+<td>UP</td></tr><tr data-ticker="0968.hk" data-month="2025-03">
+<td>2025-03</td><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2025-03-03</td><td>3.34</td>
+<td>2025-03-25</td><td>3.14</td>
+<td class="red">-5.91%</td>
+<td>3.14</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>12.0%</td>
+<td>UP</td></tr><tr data-ticker="6618.hk" data-month="2025-03">
+<td>2025-03</td><td>6618.HK</td><td>JD Health</td>
+<td>2025-03-03</td><td>34.05</td>
+<td>2025-03-31</td><td>33.15</td>
+<td class="red">-2.64%</td>
+<td>31.50</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>11.3%</td>
+<td>UP</td></tr><tr data-ticker="6098.hk" data-month="2025-04">
+<td>2025-04</td><td>6098.HK</td><td>CG Services</td>
+<td>2025-04-01</td><td>6.96</td>
+<td>2025-04-07</td><td>6.26</td>
+<td class="red">-10.00%</td>
+<td>6.26</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>11.8%</td>
+<td>UP</td></tr><tr data-ticker="1177.hk" data-month="2025-04">
+<td>2025-04</td><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2025-04-01</td><td>3.76</td>
+<td>2025-04-07</td><td>3.49</td>
+<td class="red">-7.26%</td>
+<td>3.49</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>9.7%</td>
+<td>UP</td></tr><tr data-ticker="1929.hk" data-month="2025-05">
+<td>2025-05</td><td>1929.HK</td><td>Chow Tai Fook</td>
+<td>2025-05-02</td><td>10.26</td>
+<td>2025-05-30</td><td>11.18</td>
+<td class="green">+8.97%</td>
+<td>9.23</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>13.6%</td>
+<td>UP</td></tr><tr data-ticker="1093.hk" data-month="2025-05">
+<td>2025-05</td><td>1093.HK</td><td>CSPC Pharmaceutical</td>
+<td>2025-05-02</td><td>6.15</td>
+<td>2025-05-12</td><td>5.54</td>
+<td class="red">-10.00%</td>
+<td>5.54</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>12.4%</td>
+<td>UP</td></tr><tr data-ticker="1929.hk" data-month="2025-06">
+<td>2025-06</td><td>1929.HK</td><td>Chow Tai Fook</td>
+<td>2025-06-02</td><td>11.02</td>
+<td>2025-06-30</td><td>13.42</td>
+<td class="green">+21.78%</td>
+<td>10.18</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>11.8%</td>
+<td>UP</td></tr><tr data-ticker="2269.hk" data-month="2025-06">
+<td>2025-06</td><td>2269.HK</td><td>WuXi Biologics</td>
+<td>2025-06-02</td><td>24.65</td>
+<td>2025-06-30</td><td>25.65</td>
+<td class="green">+4.06%</td>
+<td>22.42</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.1%</td>
+<td>UP</td></tr><tr data-ticker="1929.hk" data-month="2025-07">
+<td>2025-07</td><td>1929.HK</td><td>Chow Tai Fook</td>
+<td>2025-07-02</td><td>13.42</td>
+<td>2025-07-31</td><td>13.16</td>
+<td class="red">-1.94%</td>
+<td>12.33</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>9.0%</td>
+<td>UP</td></tr><tr data-ticker="2331.hk" data-month="2025-07">
+<td>2025-07</td><td>2331.HK</td><td>Li Ning</td>
+<td>2025-07-02</td><td>17.00</td>
+<td>2025-07-15</td><td>15.57</td>
+<td class="red">-8.42%</td>
+<td>15.57</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>8.4%</td>
+<td>UP</td></tr><tr data-ticker="1177.hk" data-month="2025-08">
+<td>2025-08</td><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2025-08-01</td><td>7.47</td>
+<td>2025-08-29</td><td>8.11</td>
+<td class="green">+8.57%</td>
+<td>6.80</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>7.1%</td>
+<td>UP</td></tr><tr data-ticker="1024.hk" data-month="2025-08">
+<td>2025-08</td><td>1024.HK</td><td>Kuaishou Tech</td>
+<td>2025-08-01</td><td>78.00</td>
+<td>2025-08-20</td><td>70.20</td>
+<td class="red">-10.00%</td>
+<td>70.20</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>6.4%</td>
+<td>UP</td></tr><tr data-ticker="1093.hk" data-month="2025-09">
+<td>2025-09</td><td>1093.HK</td><td>CSPC Pharmaceutical</td>
+<td>2025-09-01</td><td>10.07</td>
+<td>2025-09-26</td><td>9.16</td>
+<td class="red">-9.04%</td>
+<td>9.16</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>16.7%</td>
+<td>UP</td></tr><tr data-ticker="1177.hk" data-month="2025-09">
+<td>2025-09</td><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2025-09-01</td><td>8.20</td>
+<td>2025-09-30</td><td>8.14</td>
+<td class="red">-0.73%</td>
+<td>7.43</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>13.7%</td>
+<td>UP</td></tr><tr data-ticker="9888.hk" data-month="2025-10">
+<td>2025-10</td><td>9888.HK</td><td>Baidu</td>
+<td>2025-10-02</td><td>134.30</td>
+<td>2025-10-13</td><td>122.56</td>
+<td class="red">-8.74%</td>
+<td>122.56</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>12.0%</td>
+<td>UP</td></tr><tr data-ticker="1378.hk" data-month="2025-10">
+<td>2025-10</td><td>1378.HK</td><td>China Hongqiao</td>
+<td>2025-10-02</td><td>26.42</td>
+<td>2025-10-31</td><td>29.52</td>
+<td class="green">+11.73%</td>
+<td>23.88</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>11.7%</td>
+<td>UP</td></tr><tr data-ticker="1378.hk" data-month="2025-11">
+<td>2025-11</td><td>1378.HK</td><td>China Hongqiao</td>
+<td>2025-11-03</td><td>29.66</td>
+<td>2025-11-28</td><td>30.86</td>
+<td class="green">+4.05%</td>
+<td>26.69</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>12.6%</td>
+<td>UP</td></tr><tr data-ticker="2628.hk" data-month="2025-11">
+<td>2025-11</td><td>2628.HK</td><td>China Life</td>
+<td>2025-11-03</td><td>24.76</td>
+<td>2025-11-28</td><td>26.86</td>
+<td class="green">+8.48%</td>
+<td>22.94</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>6.7%</td>
+<td>UP</td></tr><tr data-ticker="1109.hk" data-month="2025-12">
+<td>2025-12</td><td>1109.HK</td><td>China Resources Land</td>
+<td>2025-12-01</td><td>30.16</td>
+<td>2025-12-09</td><td>28.61</td>
+<td class="red">-5.15%</td>
+<td>28.61</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>6.6%</td>
+<td>UP</td></tr><tr data-ticker="2688.hk" data-month="2025-12">
+<td>2025-12</td><td>2688.HK</td><td>ENN Energy</td>
+<td>2025-12-01</td><td>70.90</td>
+<td>2025-12-31</td><td>68.90</td>
+<td class="red">-2.82%</td>
+<td>67.48</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>6.2%</td>
+<td>UP</td></tr><tr data-ticker="1378.hk" data-month="2026-01">
+<td>2026-01</td><td>1378.HK</td><td>China Hongqiao</td>
+<td>2026-01-02</td><td>32.90</td>
+<td>2026-01-30</td><td>36.12</td>
+<td class="green">+9.79%</td>
+<td>30.45</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>10.5%</td>
+<td>UP</td></tr><tr data-ticker="2628.hk" data-month="2026-01">
+<td>2026-01</td><td>2628.HK</td><td>China Life</td>
+<td>2026-01-02</td><td>27.34</td>
+<td>2026-01-30</td><td>34.88</td>
+<td class="green">+27.58%</td>
+<td>26.43</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>8.4%</td>
+<td>UP</td></tr><tr data-ticker="6862.hk" data-month="2026-02">
+<td>2026-02</td><td>6862.HK</td><td>Haidilao</td>
+<td>2026-02-02</td><td>15.76</td>
+<td>2026-02-27</td><td>17.62</td>
+<td class="green">+11.80%</td>
+<td>14.80</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>7.2%</td>
+<td>UP</td></tr><tr data-ticker="0669.hk" data-month="2026-02">
+<td>2026-02</td><td>0669.HK</td><td>Techtronic Ind</td>
+<td>2026-02-02</td><td>106.50</td>
+<td>2026-02-27</td><td>127.60</td>
+<td class="green">+19.81%</td>
+<td>100.09</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>5.1%</td>
+<td>UP</td></tr><tr data-ticker="0857.hk" data-month="2026-03">
+<td>2026-03</td><td>0857.HK</td><td>PetroChina</td>
+<td>2026-03-02</td><td>10.10</td>
+<td>2026-03-31</td><td>10.75</td>
+<td class="green">+6.44%</td>
+<td>9.22</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>7.2%</td>
+<td>UP</td></tr><tr data-ticker="0386.hk" data-month="2026-03">
+<td>2026-03</td><td>0386.HK</td><td>China Petroleum</td>
+<td>2026-03-02</td><td>5.58</td>
+<td>2026-03-04</td><td>5.23</td>
+<td class="red">-6.26%</td>
+<td>5.23</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td>
+<td>6.4%</td>
+<td>UP</td></tr><tr data-ticker="0175.hk" data-month="2026-04">
+<td>2026-04</td><td>0175.HK</td><td>Geely Auto</td>
+<td>2026-04-01</td><td>21.38</td>
+<td>2026-04-30</td><td>22.90</td>
+<td class="green">+7.11%</td>
+<td>19.37</td>
+<td><span class="badge badge-up">📅 Month End</span></td>
+<td>11.9%</td>
+<td>UP</td></tr><tr data-ticker="1211.hk" data-month="2026-04">
+<td>2026-04</td><td>1211.HK</td><td>BYD Company</td>
+<td>2026-04-01</td><td>106.90</td>
+<td>2026-04-30</td><td>102.50</td>
+<td class="red">-4.12%</td>
+<td>96.21</td>
+<td><span class="badge badge-down">📅 Month End</span></td>
+<td>9.0%</td>
+<td>UP</td></tr></tbody></table><h2 style="color:#58a6ff;margin:24px 0 12px;font-size:18px">📅 Monthly Breakdown</h2><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2018-10</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -10.00%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2018-10-02 → 2018-10-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2319.HK</td><td>China Mengniu</td>
+<td>2018-10-02</td><td>26.05</td>
+<td>2018-10-08</td><td>23.44</td>
+<td class="red">-10.00%</td><td>23.44</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>1211.HK</td><td>BYD Company</td>
+<td>2018-10-02</td><td>18.73</td>
+<td>2018-10-10</td><td>16.86</td>
+<td class="red">-10.00%</td><td>16.86</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2018-11</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +4.87%</span>
+<span>2 trades</span>
+<span>2018-11-01 → 2018-11-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0267.HK</td><td>CITIC</td>
+<td>2018-11-01</td><td>11.46</td>
+<td>2018-11-30</td><td>12.56</td>
+<td class="green">+9.60%</td><td>11.10</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2018-11-01</td><td>4.75</td>
+<td>2018-11-30</td><td>4.76</td>
+<td class="green">+0.14%</td><td>4.28</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2018-12</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -1.73%</span>
+<span>2 trades</span>
+<span>2018-12-03 → 2018-12-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0027.HK</td><td>Galaxy Entertainment</td>
+<td>2018-12-03</td><td>50.90</td>
+<td>2018-12-31</td><td>49.80</td>
+<td class="red">-2.16%</td><td>46.48</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr><tr><td>2331.HK</td><td>Li Ning</td>
+<td>2018-12-03</td><td>8.51</td>
+<td>2018-12-31</td><td>8.40</td>
+<td class="red">-1.29%</td><td>7.66</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2019-01</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +1.68%</span>
+<span>2 trades</span>
+<span>2019-01-02 → 2019-01-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0316.HK</td><td>Orient Overseas</td>
+<td>2019-01-02</td><td>52.45</td>
+<td>2019-01-31</td><td>51.90</td>
+<td class="red">-1.05%</td><td>48.64</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr><tr><td>0003.HK</td><td>HK & China Gas</td>
+<td>2019-01-02</td><td>13.44</td>
+<td>2019-01-31</td><td>14.03</td>
+<td class="green">+4.42%</td><td>12.96</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2019-02</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +6.91%</span>
+<span>2 trades</span>
+<span>2019-02-01 → 2019-02-28</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0241.HK</td><td>Ali Health</td>
+<td>2019-02-01</td><td>7.23</td>
+<td>2019-02-28</td><td>8.05</td>
+<td class="green">+11.34%</td><td>6.53</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0027.HK</td><td>Galaxy Entertainment</td>
+<td>2019-02-01</td><td>54.40</td>
+<td>2019-02-28</td><td>55.75</td>
+<td class="green">+2.48%</td><td>50.01</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2019-03</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +11.06%</span>
+<span>2 trades</span>
+<span>2019-03-01 → 2019-03-29</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2269.HK</td><td>WuXi Biologics</td>
+<td>2019-03-01</td><td>24.60</td>
+<td>2019-03-29</td><td>25.45</td>
+<td class="green">+3.46%</td><td>23.24</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>2020.HK</td><td>ANTA Sports</td>
+<td>2019-03-01</td><td>45.00</td>
+<td>2019-03-29</td><td>53.40</td>
+<td class="green">+18.67%</td><td>42.24</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2019-04</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +7.38%</span>
+<span>2 trades</span>
+<span>2019-04-01 → 2019-04-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0881.HK</td><td>Zhongsheng Group</td>
+<td>2019-04-01</td><td>19.80</td>
+<td>2019-04-30</td><td>20.60</td>
+<td class="green">+4.04%</td><td>18.26</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0288.HK</td><td>WH Group</td>
+<td>2019-04-01</td><td>8.40</td>
+<td>2019-04-30</td><td>9.30</td>
+<td class="green">+10.71%</td><td>7.78</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2019-05</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -6.58%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2019-05-02 → 2019-05-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0291.HK</td><td>China Resources Beer</td>
+<td>2019-05-02</td><td>35.40</td>
+<td>2019-05-14</td><td>33.47</td>
+<td class="red">-5.44%</td><td>33.47</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2019-05-02</td><td>4.41</td>
+<td>2019-05-06</td><td>4.07</td>
+<td class="red">-7.73%</td><td>4.07</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2019-06</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +1.13%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2019-06-03 → 2019-06-28</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2019-06-03</td><td>4.22</td>
+<td>2019-06-06</td><td>3.84</td>
+<td class="red">-8.96%</td><td>3.84</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>6098.HK</td><td>CG Services</td>
+<td>2019-06-03</td><td>16.24</td>
+<td>2019-06-28</td><td>18.06</td>
+<td class="green">+11.21%</td><td>14.68</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2019-07</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -1.90%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2019-07-02 → 2019-07-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2331.HK</td><td>Li Ning</td>
+<td>2019-07-02</td><td>18.70</td>
+<td>2019-07-31</td><td>19.46</td>
+<td class="green">+4.06%</td><td>16.83</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0881.HK</td><td>Zhongsheng Group</td>
+<td>2019-07-02</td><td>22.00</td>
+<td>2019-07-15</td><td>20.27</td>
+<td class="red">-7.86%</td><td>20.27</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2019-08</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -7.41%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2019-08-01 → 2019-08-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2019-08-01</td><td>6.35</td>
+<td>2019-08-05</td><td>5.91</td>
+<td class="red">-6.91%</td><td>5.91</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2019-08-01</td><td>4.28</td>
+<td>2019-08-06</td><td>3.94</td>
+<td class="red">-7.90%</td><td>3.94</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2019-09</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -8.92%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2019-09-02 → 2019-09-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2019-09-02</td><td>5.10</td>
+<td>2019-09-30</td><td>4.70</td>
+<td class="red">-7.84%</td><td>4.59</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr><tr><td>2331.HK</td><td>Li Ning</td>
+<td>2019-09-02</td><td>23.90</td>
+<td>2019-09-11</td><td>21.51</td>
+<td class="red">-10.00%</td><td>21.51</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2019-10</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +18.40%</span>
+<span>2 trades</span>
+<span>2019-10-02 → 2019-10-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>3690.HK</td><td>Meituan</td>
+<td>2019-10-02</td><td>79.55</td>
+<td>2019-10-31</td><td>93.65</td>
+<td class="green">+17.72%</td><td>74.95</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>2020.HK</td><td>ANTA Sports</td>
+<td>2019-10-02</td><td>64.50</td>
+<td>2019-10-31</td><td>76.80</td>
+<td class="green">+19.07%</td><td>60.20</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2019-11</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -0.72%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2019-11-01 → 2019-11-29</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2018.HK</td><td>AAC Technologies</td>
+<td>2019-11-01</td><td>51.00</td>
+<td>2019-11-29</td><td>54.90</td>
+<td class="green">+7.65%</td><td>46.24</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2019-11-01</td><td>7.81</td>
+<td>2019-11-27</td><td>7.10</td>
+<td class="red">-9.08%</td><td>7.10</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2019-12</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +5.65%</span>
+<span>2 trades</span>
+<span>2019-12-02 → 2019-12-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2019-12-02</td><td>4.88</td>
+<td>2019-12-31</td><td>5.53</td>
+<td class="green">+13.32%</td><td>4.65</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>3690.HK</td><td>Meituan</td>
+<td>2019-12-02</td><td>104.00</td>
+<td>2019-12-31</td><td>101.90</td>
+<td class="red">-2.02%</td><td>95.25</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2020-01</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -6.13%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2020-01-02 → 2020-01-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2018.HK</td><td>AAC Technologies</td>
+<td>2020-01-02</td><td>68.30</td>
+<td>2020-01-08</td><td>62.81</td>
+<td class="red">-8.04%</td><td>62.81</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2020-01-02</td><td>5.52</td>
+<td>2020-01-07</td><td>5.29</td>
+<td class="red">-4.22%</td><td>5.29</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2020-02</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +19.06%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2020-02-03 → 2020-02-28</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2688.HK</td><td>ENN Energy</td>
+<td>2020-02-03</td><td>89.10</td>
+<td>2020-02-05</td><td>88.68</td>
+<td class="red">-0.47%</td><td>88.68</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>0241.HK</td><td>Ali Health</td>
+<td>2020-02-03</td><td>10.78</td>
+<td>2020-02-28</td><td>14.94</td>
+<td class="green">+38.59%</td><td>10.29</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2020-03</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -7.49%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2020-03-02 → 2020-03-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0241.HK</td><td>Ali Health</td>
+<td>2020-03-02</td><td>14.76</td>
+<td>2020-03-12</td><td>13.28</td>
+<td class="red">-10.00%</td><td>13.28</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>1810.HK</td><td>Xiaomi</td>
+<td>2020-03-02</td><td>12.56</td>
+<td>2020-03-10</td><td>11.94</td>
+<td class="red">-4.97%</td><td>11.94</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2020-04</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +11.13%</span>
+<span>2 trades</span>
+<span>2020-04-01 → 2020-04-29</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0960.HK</td><td>Longfor Group</td>
+<td>2020-04-01</td><td>36.35</td>
+<td>2020-04-29</td><td>39.25</td>
+<td class="green">+7.98%</td><td>32.71</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>6098.HK</td><td>CG Services</td>
+<td>2020-04-01</td><td>31.50</td>
+<td>2020-04-29</td><td>36.00</td>
+<td class="green">+14.29%</td><td>28.35</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2020-05</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +15.58%</span>
+<span>2 trades</span>
+<span>2020-05-04 → 2020-05-29</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0981.HK</td><td>SMIC</td>
+<td>2020-05-04</td><td>14.30</td>
+<td>2020-05-29</td><td>16.84</td>
+<td class="green">+17.76%</td><td>13.42</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0291.HK</td><td>China Resources Beer</td>
+<td>2020-05-04</td><td>36.20</td>
+<td>2020-05-29</td><td>41.05</td>
+<td class="green">+13.40%</td><td>33.34</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2020-06</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +9.30%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2020-06-01 → 2020-06-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2020-06-01</td><td>5.75</td>
+<td>2020-06-30</td><td>7.34</td>
+<td class="green">+27.65%</td><td>5.17</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>6862.HK</td><td>Haidilao</td>
+<td>2020-06-01</td><td>37.10</td>
+<td>2020-06-15</td><td>33.74</td>
+<td class="red">-9.06%</td><td>33.74</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2020-07</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +2.82%</span>
+<span>2 trades</span>
+<span>2020-07-02 → 2020-07-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>3690.HK</td><td>Meituan</td>
+<td>2020-07-02</td><td>176.50</td>
+<td>2020-07-31</td><td>191.90</td>
+<td class="green">+8.73%</td><td>158.85</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0017.HK</td><td>New World Dev</td>
+<td>2020-07-02</td><td>39.00</td>
+<td>2020-07-31</td><td>37.80</td>
+<td class="red">-3.08%</td><td>35.21</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2020-08</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +6.78%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2020-08-03 → 2020-08-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2018.HK</td><td>AAC Technologies</td>
+<td>2020-08-03</td><td>63.00</td>
+<td>2020-08-12</td><td>56.70</td>
+<td class="red">-10.00%</td><td>56.70</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>2269.HK</td><td>WuXi Biologics</td>
+<td>2020-08-03</td><td>54.33</td>
+<td>2020-08-31</td><td>67.13</td>
+<td class="green">+23.56%</td><td>48.90</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2020-09</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -9.58%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2020-09-01 → 2020-09-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>3690.HK</td><td>Meituan</td>
+<td>2020-09-01</td><td>256.20</td>
+<td>2020-09-08</td><td>232.75</td>
+<td class="red">-9.15%</td><td>232.75</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2020-09-01</td><td>9.95</td>
+<td>2020-09-09</td><td>8.95</td>
+<td class="red">-10.00%</td><td>8.95</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2020-10</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +10.48%</span>
+<span>2 trades</span>
+<span>2020-10-05 → 2020-10-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2331.HK</td><td>Li Ning</td>
+<td>2020-10-05</td><td>36.25</td>
+<td>2020-10-30</td><td>40.00</td>
+<td class="green">+10.34%</td><td>33.86</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>2269.HK</td><td>WuXi Biologics</td>
+<td>2020-10-05</td><td>65.27</td>
+<td>2020-10-30</td><td>72.20</td>
+<td class="green">+10.62%</td><td>58.74</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2020-11</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +17.90%</span>
+<span>2 trades</span>
+<span>2020-11-02 → 2020-11-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1378.HK</td><td>China Hongqiao</td>
+<td>2020-11-02</td><td>5.71</td>
+<td>2020-11-30</td><td>6.77</td>
+<td class="green">+18.56%</td><td>5.16</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>2382.HK</td><td>Sunny Optical</td>
+<td>2020-11-02</td><td>130.00</td>
+<td>2020-11-30</td><td>152.40</td>
+<td class="green">+17.23%</td><td>119.92</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2020-12</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +7.21%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2020-12-01 → 2020-12-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2020-12-01</td><td>14.22</td>
+<td>2020-12-07</td><td>12.80</td>
+<td class="red">-10.00%</td><td>12.80</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>0868.HK</td><td>Xinyi Glass</td>
+<td>2020-12-01</td><td>17.40</td>
+<td>2020-12-31</td><td>21.65</td>
+<td class="green">+24.43%</td><td>16.05</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2021-01</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -7.15%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2021-01-04 → 2021-01-29</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2021-01-04</td><td>20.05</td>
+<td>2021-01-27</td><td>18.04</td>
+<td class="red">-10.00%</td><td>18.04</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>0291.HK</td><td>China Resources Beer</td>
+<td>2021-01-04</td><td>69.15</td>
+<td>2021-01-14</td><td>66.18</td>
+<td class="red">-4.30%</td><td>66.18</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2021-02</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -5.09%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2021-02-01 → 2021-02-26</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>3690.HK</td><td>Meituan</td>
+<td>2021-02-01</td><td>369.00</td>
+<td>2021-02-26</td><td>347.27</td>
+<td class="red">-5.89%</td><td>347.27</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>6862.HK</td><td>Haidilao</td>
+<td>2021-02-01</td><td>66.50</td>
+<td>2021-02-26</td><td>63.65</td>
+<td class="red">-4.29%</td><td>61.66</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2021-03</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -1.04%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2021-03-01 → 2021-03-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1378.HK</td><td>China Hongqiao</td>
+<td>2021-03-01</td><td>9.62</td>
+<td>2021-03-31</td><td>10.38</td>
+<td class="green">+7.90%</td><td>8.77</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0241.HK</td><td>Ali Health</td>
+<td>2021-03-01</td><td>27.95</td>
+<td>2021-03-05</td><td>25.16</td>
+<td class="red">-9.97%</td><td>25.16</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2021-04</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +6.99%</span>
+<span>2 trades</span>
+<span>2021-04-01 → 2021-04-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0868.HK</td><td>Xinyi Glass</td>
+<td>2021-04-01</td><td>25.40</td>
+<td>2021-04-30</td><td>27.55</td>
+<td class="green">+8.46%</td><td>22.86</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0669.HK</td><td>Techtronic Ind</td>
+<td>2021-04-01</td><td>134.20</td>
+<td>2021-04-30</td><td>141.60</td>
+<td class="green">+5.51%</td><td>120.78</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2021-05</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +2.86%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2021-05-03 → 2021-05-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1378.HK</td><td>China Hongqiao</td>
+<td>2021-05-03</td><td>12.20</td>
+<td>2021-05-20</td><td>10.98</td>
+<td class="red">-10.00%</td><td>10.98</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>2331.HK</td><td>Li Ning</td>
+<td>2021-05-03</td><td>62.95</td>
+<td>2021-05-31</td><td>72.85</td>
+<td class="green">+15.73%</td><td>57.92</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2021-06</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +24.03%</span>
+<span>2 trades</span>
+<span>2021-06-01 → 2021-06-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2269.HK</td><td>WuXi Biologics</td>
+<td>2021-06-01</td><td>120.40</td>
+<td>2021-06-30</td><td>142.30</td>
+<td class="green">+18.19%</td><td>109.53</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>2331.HK</td><td>Li Ning</td>
+<td>2021-06-01</td><td>73.00</td>
+<td>2021-06-30</td><td>94.80</td>
+<td class="green">+29.86%</td><td>66.69</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2021-07</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -9.94%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2021-07-02 → 2021-07-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0316.HK</td><td>Orient Overseas</td>
+<td>2021-07-02</td><td>168.80</td>
+<td>2021-07-14</td><td>151.92</td>
+<td class="red">-10.00%</td><td>151.92</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>2382.HK</td><td>Sunny Optical</td>
+<td>2021-07-02</td><td>242.00</td>
+<td>2021-07-12</td><td>218.08</td>
+<td class="red">-9.89%</td><td>218.08</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2021-08</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -7.72%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2021-08-02 → 2021-08-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2382.HK</td><td>Sunny Optical</td>
+<td>2021-08-02</td><td>232.80</td>
+<td>2021-08-16</td><td>209.52</td>
+<td class="red">-10.00%</td><td>209.52</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>2688.HK</td><td>ENN Energy</td>
+<td>2021-08-02</td><td>163.30</td>
+<td>2021-08-24</td><td>154.42</td>
+<td class="red">-5.44%</td><td>154.42</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2021-09</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -10.00%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2021-09-01 → 2021-09-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2331.HK</td><td>Li Ning</td>
+<td>2021-09-01</td><td>105.00</td>
+<td>2021-09-21</td><td>94.50</td>
+<td class="red">-10.00%</td><td>94.50</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>0316.HK</td><td>Orient Overseas</td>
+<td>2021-09-01</td><td>200.40</td>
+<td>2021-09-02</td><td>180.36</td>
+<td class="red">-10.00%</td><td>180.36</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2021-10</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -3.40%</span>
+<span>2 trades</span>
+<span>2021-10-04 → 2021-10-29</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1109.HK</td><td>China Resources Land</td>
+<td>2021-10-04</td><td>31.70</td>
+<td>2021-10-29</td><td>30.30</td>
+<td class="red">-4.42%</td><td>28.53</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr><tr><td>0883.HK</td><td>CNOOC</td>
+<td>2021-10-04</td><td>8.79</td>
+<td>2021-10-29</td><td>8.58</td>
+<td class="red">-2.39%</td><td>8.19</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2021-11</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -3.15%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2021-11-01 → 2021-11-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1024.HK</td><td>Kuaishou Tech</td>
+<td>2021-11-01</td><td>103.60</td>
+<td>2021-11-03</td><td>93.24</td>
+<td class="red">-10.00%</td><td>93.24</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>0322.HK</td><td>TCL Electronics</td>
+<td>2021-11-01</td><td>14.56</td>
+<td>2021-11-30</td><td>15.10</td>
+<td class="green">+3.71%</td><td>13.80</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2021-12</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +15.61%</span>
+<span>2 trades</span>
+<span>2021-12-01 → 2021-12-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0316.HK</td><td>Orient Overseas</td>
+<td>2021-12-01</td><td>149.10</td>
+<td>2021-12-31</td><td>191.30</td>
+<td class="green">+28.30%</td><td>134.19</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>2382.HK</td><td>Sunny Optical</td>
+<td>2021-12-01</td><td>239.60</td>
+<td>2021-12-31</td><td>246.60</td>
+<td class="green">+2.92%</td><td>215.64</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2022-01</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -0.44%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2022-01-03 → 2022-01-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1378.HK</td><td>China Hongqiao</td>
+<td>2022-01-03</td><td>8.23</td>
+<td>2022-01-31</td><td>8.71</td>
+<td class="green">+5.83%</td><td>7.59</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>2688.HK</td><td>ENN Energy</td>
+<td>2022-01-03</td><td>146.80</td>
+<td>2022-01-06</td><td>136.94</td>
+<td class="red">-6.72%</td><td>136.94</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2022-02</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -3.52%</span>
+<span>2 trades</span>
+<span>2022-02-04 → 2022-02-28</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1024.HK</td><td>Kuaishou Tech</td>
+<td>2022-02-04</td><td>88.80</td>
+<td>2022-02-28</td><td>89.55</td>
+<td class="green">+0.84%</td><td>79.92</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>1928.HK</td><td>Sands China</td>
+<td>2022-02-04</td><td>22.20</td>
+<td>2022-02-28</td><td>20.45</td>
+<td class="red">-7.88%</td><td>19.98</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2022-03</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -9.85%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2022-03-01 → 2022-03-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0316.HK</td><td>Orient Overseas</td>
+<td>2022-03-01</td><td>221.40</td>
+<td>2022-03-15</td><td>199.26</td>
+<td class="red">-10.00%</td><td>199.26</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>1378.HK</td><td>China Hongqiao</td>
+<td>2022-03-01</td><td>10.72</td>
+<td>2022-03-09</td><td>9.68</td>
+<td class="red">-9.69%</td><td>9.68</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2022-04</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -3.59%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2022-04-01 → 2022-04-29</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0883.HK</td><td>CNOOC</td>
+<td>2022-04-01</td><td>10.56</td>
+<td>2022-04-26</td><td>9.93</td>
+<td class="red">-5.97%</td><td>9.93</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>1113.HK</td><td>CK Asset Holdings</td>
+<td>2022-04-01</td><td>54.05</td>
+<td>2022-04-29</td><td>53.40</td>
+<td class="red">-1.20%</td><td>50.60</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2022-05</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -9.06%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2022-05-03 → 2022-05-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1211.HK</td><td>BYD Company</td>
+<td>2022-05-03</td><td>75.67</td>
+<td>2022-05-10</td><td>69.53</td>
+<td class="red">-8.11%</td><td>69.53</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>9999.HK</td><td>NetEase</td>
+<td>2022-05-03</td><td>150.00</td>
+<td>2022-05-10</td><td>135.00</td>
+<td class="red">-10.00%</td><td>135.00</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2022-06</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +2.88%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2022-06-01 → 2022-06-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1211.HK</td><td>BYD Company</td>
+<td>2022-06-01</td><td>93.33</td>
+<td>2022-06-30</td><td>104.67</td>
+<td class="green">+12.14%</td><td>84.00</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0316.HK</td><td>Orient Overseas</td>
+<td>2022-06-01</td><td>243.80</td>
+<td>2022-06-13</td><td>228.26</td>
+<td class="red">-6.38%</td><td>228.26</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2022-07</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -2.35%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2022-07-04 → 2022-07-29</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0241.HK</td><td>Ali Health</td>
+<td>2022-07-04</td><td>5.32</td>
+<td>2022-07-29</td><td>4.79</td>
+<td class="red">-10.00%</td><td>4.79</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>2269.HK</td><td>WuXi Biologics</td>
+<td>2022-07-04</td><td>70.80</td>
+<td>2022-07-29</td><td>74.55</td>
+<td class="green">+5.30%</td><td>66.26</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2022-08</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -10.00%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2022-08-01 → 2022-08-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1928.HK</td><td>Sands China</td>
+<td>2022-08-01</td><td>18.76</td>
+<td>2022-08-18</td><td>16.88</td>
+<td class="red">-10.00%</td><td>16.88</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>0316.HK</td><td>Orient Overseas</td>
+<td>2022-08-01</td><td>279.00</td>
+<td>2022-08-04</td><td>251.10</td>
+<td class="red">-10.00%</td><td>251.10</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2022-09</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -10.00%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2022-09-01 → 2022-09-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>6862.HK</td><td>Haidilao</td>
+<td>2022-09-01</td><td>18.60</td>
+<td>2022-09-07</td><td>16.74</td>
+<td class="red">-10.00%</td><td>16.74</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>2331.HK</td><td>Li Ning</td>
+<td>2022-09-01</td><td>71.00</td>
+<td>2022-09-19</td><td>63.90</td>
+<td class="red">-10.00%</td><td>63.90</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2022-10</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -5.29%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2022-10-03 → 2022-10-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1928.HK</td><td>Sands China</td>
+<td>2022-10-03</td><td>19.56</td>
+<td>2022-10-12</td><td>18.45</td>
+<td class="red">-5.69%</td><td>18.45</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>0019.HK</td><td>Swire Pacific</td>
+<td>2022-10-03</td><td>58.90</td>
+<td>2022-10-14</td><td>56.02</td>
+<td class="red">-4.89%</td><td>56.02</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2022-11</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +18.51%</span>
+<span>2 trades</span>
+<span>2022-11-01 → 2022-11-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1093.HK</td><td>CSPC Pharmaceutical</td>
+<td>2022-11-01</td><td>8.44</td>
+<td>2022-11-30</td><td>9.99</td>
+<td class="green">+18.36%</td><td>7.77</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2022-11-01</td><td>3.86</td>
+<td>2022-11-30</td><td>4.58</td>
+<td class="green">+18.65%</td><td>3.72</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2022-12</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -10.00%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2022-12-01 → 2022-12-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>6098.HK</td><td>CG Services</td>
+<td>2022-12-01</td><td>19.86</td>
+<td>2022-12-15</td><td>17.87</td>
+<td class="red">-10.00%</td><td>17.87</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>2007.HK</td><td>Country Garden</td>
+<td>2022-12-01</td><td>3.08</td>
+<td>2022-12-02</td><td>2.77</td>
+<td class="red">-10.00%</td><td>2.77</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2023-01</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -4.05%</span>
+<span>2 trades</span>
+<span>2023-01-03 → 2023-01-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1024.HK</td><td>Kuaishou Tech</td>
+<td>2023-01-03</td><td>70.75</td>
+<td>2023-01-31</td><td>68.65</td>
+<td class="red">-2.97%</td><td>63.68</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr><tr><td>6862.HK</td><td>Haidilao</td>
+<td>2023-01-03</td><td>22.40</td>
+<td>2023-01-31</td><td>21.25</td>
+<td class="red">-5.13%</td><td>20.16</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2023-02</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -4.32%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2023-02-01 → 2023-02-28</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>6098.HK</td><td>CG Services</td>
+<td>2023-02-01</td><td>21.55</td>
+<td>2023-02-03</td><td>19.39</td>
+<td class="red">-10.00%</td><td>19.39</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>9888.HK</td><td>Baidu</td>
+<td>2023-02-01</td><td>133.00</td>
+<td>2023-02-28</td><td>134.80</td>
+<td class="green">+1.35%</td><td>126.03</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2023-03</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +4.70%</span>
+<span>2 trades</span>
+<span>2023-03-01 → 2023-03-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>9961.HK</td><td>Trip.com</td>
+<td>2023-03-01</td><td>277.60</td>
+<td>2023-03-31</td><td>293.80</td>
+<td class="green">+5.84%</td><td>272.32</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>9633.HK</td><td>Nongfu Spring</td>
+<td>2023-03-01</td><td>43.60</td>
+<td>2023-03-31</td><td>45.15</td>
+<td class="green">+3.56%</td><td>42.42</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2023-04</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -5.35%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2023-04-03 → 2023-04-28</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0291.HK</td><td>China Resources Beer</td>
+<td>2023-04-03</td><td>62.55</td>
+<td>2023-04-28</td><td>60.35</td>
+<td class="red">-3.52%</td><td>58.41</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr><tr><td>9888.HK</td><td>Baidu</td>
+<td>2023-04-03</td><td>146.50</td>
+<td>2023-04-11</td><td>135.98</td>
+<td class="red">-7.18%</td><td>135.98</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2023-05</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -6.32%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2023-05-02 → 2023-05-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0386.HK</td><td>China Petroleum</td>
+<td>2023-05-02</td><td>5.15</td>
+<td>2023-05-31</td><td>4.93</td>
+<td class="red">-4.27%</td><td>4.81</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr><tr><td>2628.HK</td><td>China Life</td>
+<td>2023-05-02</td><td>15.08</td>
+<td>2023-05-25</td><td>13.82</td>
+<td class="red">-8.37%</td><td>13.82</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2023-06</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +6.29%</span>
+<span>2 trades</span>
+<span>2023-06-01 → 2023-06-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1024.HK</td><td>Kuaishou Tech</td>
+<td>2023-06-01</td><td>52.45</td>
+<td>2023-06-30</td><td>53.55</td>
+<td class="green">+2.10%</td><td>48.62</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>9888.HK</td><td>Baidu</td>
+<td>2023-06-01</td><td>120.20</td>
+<td>2023-06-30</td><td>132.80</td>
+<td class="green">+10.48%</td><td>113.34</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2023-07</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +1.66%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2023-07-03 → 2023-07-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2023-07-03</td><td>8.98</td>
+<td>2023-07-07</td><td>8.54</td>
+<td class="red">-4.85%</td><td>8.54</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>2313.HK</td><td>Shenzhou International</td>
+<td>2023-07-03</td><td>75.85</td>
+<td>2023-07-31</td><td>82.05</td>
+<td class="green">+8.17%</td><td>70.23</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2023-08</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -8.45%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2023-08-01 → 2023-08-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>9888.HK</td><td>Baidu</td>
+<td>2023-08-01</td><td>152.90</td>
+<td>2023-08-09</td><td>139.63</td>
+<td class="red">-8.68%</td><td>139.63</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>0241.HK</td><td>Ali Health</td>
+<td>2023-08-01</td><td>5.61</td>
+<td>2023-08-14</td><td>5.15</td>
+<td class="red">-8.22%</td><td>5.15</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2023-09</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -2.37%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2023-09-04 → 2023-09-29</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2020.HK</td><td>ANTA Sports</td>
+<td>2023-09-04</td><td>89.00</td>
+<td>2023-09-29</td><td>88.15</td>
+<td class="red">-0.96%</td><td>81.98</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr><tr><td>9961.HK</td><td>Trip.com</td>
+<td>2023-09-04</td><td>311.80</td>
+<td>2023-09-06</td><td>300.01</td>
+<td class="red">-3.78%</td><td>300.01</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2023-10</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -0.39%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2023-10-03 → 2023-10-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2269.HK</td><td>WuXi Biologics</td>
+<td>2023-10-03</td><td>44.50</td>
+<td>2023-10-31</td><td>48.60</td>
+<td class="green">+9.21%</td><td>40.39</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0241.HK</td><td>Ali Health</td>
+<td>2023-10-03</td><td>4.82</td>
+<td>2023-10-24</td><td>4.34</td>
+<td class="red">-10.00%</td><td>4.34</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2023-11</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +2.93%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2023-11-01 → 2023-11-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1810.HK</td><td>Xiaomi</td>
+<td>2023-11-01</td><td>14.16</td>
+<td>2023-11-30</td><td>15.62</td>
+<td class="green">+10.31%</td><td>13.01</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>2313.HK</td><td>Shenzhou International</td>
+<td>2023-11-01</td><td>77.50</td>
+<td>2023-11-30</td><td>74.05</td>
+<td class="red">-4.45%</td><td>74.05</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2023-12</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -10.00%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2023-12-01 → 2023-12-29</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2382.HK</td><td>Sunny Optical</td>
+<td>2023-12-01</td><td>74.15</td>
+<td>2023-12-05</td><td>66.74</td>
+<td class="red">-10.00%</td><td>66.74</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2023-12-01</td><td>3.84</td>
+<td>2023-12-06</td><td>3.46</td>
+<td class="red">-10.00%</td><td>3.46</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2024-01</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -10.00%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2024-01-02 → 2024-01-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>9618.HK</td><td>JD.com</td>
+<td>2024-01-02</td><td>113.00</td>
+<td>2024-01-08</td><td>101.70</td>
+<td class="red">-10.00%</td><td>101.70</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>2018.HK</td><td>AAC Technologies</td>
+<td>2024-01-02</td><td>23.40</td>
+<td>2024-01-05</td><td>21.06</td>
+<td class="red">-10.00%</td><td>21.06</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2024-02</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -7.70%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2024-02-01 → 2024-02-29</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2688.HK</td><td>ENN Energy</td>
+<td>2024-02-01</td><td>58.15</td>
+<td>2024-02-09</td><td>53.53</td>
+<td class="red">-7.95%</td><td>53.53</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>0316.HK</td><td>Orient Overseas</td>
+<td>2024-02-01</td><td>117.80</td>
+<td>2024-02-09</td><td>109.01</td>
+<td class="red">-7.46%</td><td>109.01</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2024-03</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +22.84%</span>
+<span>2 trades</span>
+<span>2024-03-01 → 2024-03-28</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>3690.HK</td><td>Meituan</td>
+<td>2024-03-01</td><td>79.00</td>
+<td>2024-03-28</td><td>96.80</td>
+<td class="green">+22.53%</td><td>75.98</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>6862.HK</td><td>Haidilao</td>
+<td>2024-03-01</td><td>14.34</td>
+<td>2024-03-28</td><td>17.66</td>
+<td class="green">+23.15%</td><td>12.91</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2024-04</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -0.14%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2024-04-02 → 2024-04-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>3690.HK</td><td>Meituan</td>
+<td>2024-04-02</td><td>99.80</td>
+<td>2024-04-30</td><td>109.50</td>
+<td class="green">+9.72%</td><td>89.82</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0960.HK</td><td>Longfor Group</td>
+<td>2024-04-02</td><td>11.16</td>
+<td>2024-04-05</td><td>10.04</td>
+<td class="red">-10.00%</td><td>10.04</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2024-05</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -1.28%</span>
+<span>2 trades</span>
+<span>2024-05-02 → 2024-05-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0881.HK</td><td>Zhongsheng Group</td>
+<td>2024-05-02</td><td>14.38</td>
+<td>2024-05-31</td><td>14.14</td>
+<td class="red">-1.67%</td><td>13.25</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr><tr><td>1024.HK</td><td>Kuaishou Tech</td>
+<td>2024-05-02</td><td>55.95</td>
+<td>2024-05-31</td><td>55.45</td>
+<td class="red">-0.89%</td><td>51.69</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2024-06</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +1.21%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2024-06-03 → 2024-06-28</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1378.HK</td><td>China Hongqiao</td>
+<td>2024-06-03</td><td>12.90</td>
+<td>2024-06-13</td><td>11.64</td>
+<td class="red">-9.79%</td><td>11.64</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>2382.HK</td><td>Sunny Optical</td>
+<td>2024-06-03</td><td>43.00</td>
+<td>2024-06-28</td><td>48.25</td>
+<td class="green">+12.21%</td><td>39.26</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2024-07</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -5.73%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2024-07-02 → 2024-07-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0883.HK</td><td>CNOOC</td>
+<td>2024-07-02</td><td>23.00</td>
+<td>2024-07-17</td><td>21.21</td>
+<td class="red">-7.79%</td><td>21.21</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>1398.HK</td><td>ICBC</td>
+<td>2024-07-02</td><td>4.64</td>
+<td>2024-07-08</td><td>4.47</td>
+<td class="red">-3.67%</td><td>4.47</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2024-08</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +3.16%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2024-08-01 → 2024-08-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1038.HK</td><td>CKI Holdings</td>
+<td>2024-08-01</td><td>51.85</td>
+<td>2024-08-30</td><td>57.90</td>
+<td class="green">+11.67%</td><td>50.07</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0001.HK</td><td>CK Hutchison</td>
+<td>2024-08-01</td><td>41.00</td>
+<td>2024-08-16</td><td>38.81</td>
+<td class="red">-5.35%</td><td>38.81</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2024-09</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +28.54%</span>
+<span>2 trades</span>
+<span>2024-09-02 → 2024-09-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>6618.HK</td><td>JD Health</td>
+<td>2024-09-02</td><td>23.55</td>
+<td>2024-09-30</td><td>35.00</td>
+<td class="green">+48.62%</td><td>21.19</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0288.HK</td><td>WH Group</td>
+<td>2024-09-02</td><td>5.68</td>
+<td>2024-09-30</td><td>6.16</td>
+<td class="green">+8.45%</td><td>5.23</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2024-10</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -0.51%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2024-10-02 → 2024-10-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2018.HK</td><td>AAC Technologies</td>
+<td>2024-10-02</td><td>31.05</td>
+<td>2024-10-31</td><td>31.45</td>
+<td class="green">+1.29%</td><td>28.45</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0669.HK</td><td>Techtronic Ind</td>
+<td>2024-10-02</td><td>112.50</td>
+<td>2024-10-08</td><td>109.91</td>
+<td class="red">-2.30%</td><td>109.91</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2024-11</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -3.61%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2024-11-01 → 2024-11-29</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1810.HK</td><td>Xiaomi</td>
+<td>2024-11-01</td><td>27.00</td>
+<td>2024-11-29</td><td>27.75</td>
+<td class="green">+2.78%</td><td>24.30</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2024-11-01</td><td>4.01</td>
+<td>2024-11-07</td><td>3.61</td>
+<td class="red">-10.00%</td><td>3.61</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2024-12</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +14.37%</span>
+<span>2 trades</span>
+<span>2024-12-02 → 2024-12-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>2018.HK</td><td>AAC Technologies</td>
+<td>2024-12-02</td><td>35.35</td>
+<td>2024-12-31</td><td>37.50</td>
+<td class="green">+6.08%</td><td>32.13</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>1810.HK</td><td>Xiaomi</td>
+<td>2024-12-02</td><td>28.25</td>
+<td>2024-12-31</td><td>34.65</td>
+<td class="green">+22.65%</td><td>26.01</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2025-01</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +2.39%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2025-01-02 → 2025-01-28</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1810.HK</td><td>Xiaomi</td>
+<td>2025-01-02</td><td>34.80</td>
+<td>2025-01-28</td><td>38.15</td>
+<td class="green">+9.63%</td><td>31.40</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0386.HK</td><td>China Petroleum</td>
+<td>2025-01-02</td><td>4.44</td>
+<td>2025-01-24</td><td>4.23</td>
+<td class="red">-4.84%</td><td>4.23</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2025-02</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +25.85%</span>
+<span>2 trades</span>
+<span>2025-02-03 → 2025-02-28</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0981.HK</td><td>SMIC</td>
+<td>2025-02-03</td><td>38.60</td>
+<td>2025-02-28</td><td>53.60</td>
+<td class="green">+38.86%</td><td>36.33</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>2018.HK</td><td>AAC Technologies</td>
+<td>2025-02-03</td><td>39.70</td>
+<td>2025-02-28</td><td>44.80</td>
+<td class="green">+12.85%</td><td>36.12</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2025-03</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -4.28%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2025-03-03 → 2025-03-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0968.HK</td><td>Xinyi Solar</td>
+<td>2025-03-03</td><td>3.34</td>
+<td>2025-03-25</td><td>3.14</td>
+<td class="red">-5.91%</td><td>3.14</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>6618.HK</td><td>JD Health</td>
+<td>2025-03-03</td><td>34.05</td>
+<td>2025-03-31</td><td>33.15</td>
+<td class="red">-2.64%</td><td>31.50</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2025-04</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -8.63%</span>
+<span>2 trades | ⛔ 2 stopped</span>
+<span>2025-04-01 → 2025-04-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>6098.HK</td><td>CG Services</td>
+<td>2025-04-01</td><td>6.96</td>
+<td>2025-04-07</td><td>6.26</td>
+<td class="red">-10.00%</td><td>6.26</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2025-04-01</td><td>3.76</td>
+<td>2025-04-07</td><td>3.49</td>
+<td class="red">-7.26%</td><td>3.49</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2025-05</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -0.52%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2025-05-02 → 2025-05-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1929.HK</td><td>Chow Tai Fook</td>
+<td>2025-05-02</td><td>10.26</td>
+<td>2025-05-30</td><td>11.18</td>
+<td class="green">+8.97%</td><td>9.23</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>1093.HK</td><td>CSPC Pharmaceutical</td>
+<td>2025-05-02</td><td>6.15</td>
+<td>2025-05-12</td><td>5.54</td>
+<td class="red">-10.00%</td><td>5.54</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2025-06</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +12.92%</span>
+<span>2 trades</span>
+<span>2025-06-02 → 2025-06-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1929.HK</td><td>Chow Tai Fook</td>
+<td>2025-06-02</td><td>11.02</td>
+<td>2025-06-30</td><td>13.42</td>
+<td class="green">+21.78%</td><td>10.18</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>2269.HK</td><td>WuXi Biologics</td>
+<td>2025-06-02</td><td>24.65</td>
+<td>2025-06-30</td><td>25.65</td>
+<td class="green">+4.06%</td><td>22.42</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2025-07</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -5.18%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2025-07-02 → 2025-07-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1929.HK</td><td>Chow Tai Fook</td>
+<td>2025-07-02</td><td>13.42</td>
+<td>2025-07-31</td><td>13.16</td>
+<td class="red">-1.94%</td><td>12.33</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr><tr><td>2331.HK</td><td>Li Ning</td>
+<td>2025-07-02</td><td>17.00</td>
+<td>2025-07-15</td><td>15.57</td>
+<td class="red">-8.42%</td><td>15.57</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2025-08</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -0.72%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2025-08-01 → 2025-08-29</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2025-08-01</td><td>7.47</td>
+<td>2025-08-29</td><td>8.11</td>
+<td class="green">+8.57%</td><td>6.80</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>1024.HK</td><td>Kuaishou Tech</td>
+<td>2025-08-01</td><td>78.00</td>
+<td>2025-08-20</td><td>70.20</td>
+<td class="red">-10.00%</td><td>70.20</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2025-09</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -4.89%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2025-09-01 → 2025-09-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1093.HK</td><td>CSPC Pharmaceutical</td>
+<td>2025-09-01</td><td>10.07</td>
+<td>2025-09-26</td><td>9.16</td>
+<td class="red">-9.04%</td><td>9.16</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>1177.HK</td><td>Sino Biopharmaceutical</td>
+<td>2025-09-01</td><td>8.20</td>
+<td>2025-09-30</td><td>8.14</td>
+<td class="red">-0.73%</td><td>7.43</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2025-10</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +1.50%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2025-10-02 → 2025-10-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>9888.HK</td><td>Baidu</td>
+<td>2025-10-02</td><td>134.30</td>
+<td>2025-10-13</td><td>122.56</td>
+<td class="red">-8.74%</td><td>122.56</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>1378.HK</td><td>China Hongqiao</td>
+<td>2025-10-02</td><td>26.42</td>
+<td>2025-10-31</td><td>29.52</td>
+<td class="green">+11.73%</td><td>23.88</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2025-11</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +6.26%</span>
+<span>2 trades</span>
+<span>2025-11-03 → 2025-11-28</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1378.HK</td><td>China Hongqiao</td>
+<td>2025-11-03</td><td>29.66</td>
+<td>2025-11-28</td><td>30.86</td>
+<td class="green">+4.05%</td><td>26.69</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>2628.HK</td><td>China Life</td>
+<td>2025-11-03</td><td>24.76</td>
+<td>2025-11-28</td><td>26.86</td>
+<td class="green">+8.48%</td><td>22.94</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📉 2025-12</h2>
+<div class="meta"><span style="color:#f85149;font-weight:700">Avg: -3.99%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2025-12-01 → 2025-12-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1109.HK</td><td>China Resources Land</td>
+<td>2025-12-01</td><td>30.16</td>
+<td>2025-12-09</td><td>28.61</td>
+<td class="red">-5.15%</td><td>28.61</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr><tr><td>2688.HK</td><td>ENN Energy</td>
+<td>2025-12-01</td><td>70.90</td>
+<td>2025-12-31</td><td>68.90</td>
+<td class="red">-2.82%</td><td>67.48</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2026-01</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +18.68%</span>
+<span>2 trades</span>
+<span>2026-01-02 → 2026-01-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>1378.HK</td><td>China Hongqiao</td>
+<td>2026-01-02</td><td>32.90</td>
+<td>2026-01-30</td><td>36.12</td>
+<td class="green">+9.79%</td><td>30.45</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>2628.HK</td><td>China Life</td>
+<td>2026-01-02</td><td>27.34</td>
+<td>2026-01-30</td><td>34.88</td>
+<td class="green">+27.58%</td><td>26.43</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2026-02</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +15.81%</span>
+<span>2 trades</span>
+<span>2026-02-02 → 2026-02-27</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>6862.HK</td><td>Haidilao</td>
+<td>2026-02-02</td><td>15.76</td>
+<td>2026-02-27</td><td>17.62</td>
+<td class="green">+11.80%</td><td>14.80</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0669.HK</td><td>Techtronic Ind</td>
+<td>2026-02-02</td><td>106.50</td>
+<td>2026-02-27</td><td>127.60</td>
+<td class="green">+19.81%</td><td>100.09</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2026-03</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +0.09%</span>
+<span>2 trades | ⛔ 1 stopped</span>
+<span>2026-03-02 → 2026-03-31</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0857.HK</td><td>PetroChina</td>
+<td>2026-03-02</td><td>10.10</td>
+<td>2026-03-31</td><td>10.75</td>
+<td class="green">+6.44%</td><td>9.22</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>0386.HK</td><td>China Petroleum</td>
+<td>2026-03-02</td><td>5.58</td>
+<td>2026-03-04</td><td>5.23</td>
+<td class="red">-6.26%</td><td>5.23</td>
+<td><span class="badge badge-stop">⛔ STOP</span></td></tr></tbody></table></div></div><div class="month-section">
+<div class="month-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('show')">
+<div><h2>📈 2026-04</h2>
+<div class="meta"><span style="color:#3fb950;font-weight:700">Avg: +1.50%</span>
+<span>2 trades</span>
+<span>2026-04-01 → 2026-04-30</span></div></div>
+<div class="arrow">▼</div></div>
+<div class="month-body">
+<table><thead><tr><th>Ticker</th><th>Name</th><th>Buy</th><th>Buy Price</th><th>Exit</th><th>Exit Price</th><th>P&L%</th><th>Stop Level</th><th>Exit Reason</th></tr></thead><tbody><tr><td>0175.HK</td><td>Geely Auto</td>
+<td>2026-04-01</td><td>21.38</td>
+<td>2026-04-30</td><td>22.90</td>
+<td class="green">+7.11%</td><td>19.37</td>
+<td><span class="badge badge-up">📅 Month End</span></td></tr><tr><td>1211.HK</td><td>BYD Company</td>
+<td>2026-04-01</td><td>106.90</td>
+<td>2026-04-30</td><td>102.50</td>
+<td class="red">-4.12%</td><td>96.21</td>
+<td><span class="badge badge-down">📅 Month End</span></td></tr></tbody></table></div></div><div style="max-width:1200px;margin:24px auto;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px">
+<h3 style="color:#3fb950;margin-bottom:10px">🏆 Top 10 Winners</h3>
+<table><thead><tr><th>Ticker</th><th>Month</th><th>P&L%</th><th>Exit</th></tr></thead><tbody><tr><td>6618.HK</td><td>2024-09</td><td class='green'>+48.62%</td><td>📅</td></tr><tr><td>0981.HK</td><td>2025-02</td><td class='green'>+38.86%</td><td>📅</td></tr><tr><td>0241.HK</td><td>2020-02</td><td class='green'>+38.59%</td><td>📅</td></tr><tr><td>2331.HK</td><td>2021-06</td><td class='green'>+29.86%</td><td>📅</td></tr><tr><td>0316.HK</td><td>2021-12</td><td class='green'>+28.30%</td><td>📅</td></tr><tr><td>0968.HK</td><td>2020-06</td><td class='green'>+27.65%</td><td>📅</td></tr><tr><td>2628.HK</td><td>2026-01</td><td class='green'>+27.58%</td><td>📅</td></tr><tr><td>0868.HK</td><td>2020-12</td><td class='green'>+24.43%</td><td>📅</td></tr><tr><td>2269.HK</td><td>2020-08</td><td class='green'>+23.56%</td><td>📅</td></tr><tr><td>6862.HK</td><td>2024-03</td><td class='green'>+23.15%</td><td>📅</td></tr></tbody></table></div>
+<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px">
+<h3 style="color:#f85149;margin-bottom:10px">💀 Top 10 Losers</h3>
+<table><thead><tr><th>Ticker</th><th>Month</th><th>P&L%</th><th>Exit</th></tr></thead><tbody><tr><td>0241.HK</td><td>2023-10</td><td class='red'>-10.00%</td><td>⛔STOP</td></tr><tr><td>2382.HK</td><td>2023-12</td><td class='red'>-10.00%</td><td>⛔STOP</td></tr><tr><td>1177.HK</td><td>2023-12</td><td class='red'>-10.00%</td><td>⛔STOP</td></tr><tr><td>9618.HK</td><td>2024-01</td><td class='red'>-10.00%</td><td>⛔STOP</td></tr><tr><td>2018.HK</td><td>2024-01</td><td class='red'>-10.00%</td><td>⛔STOP</td></tr><tr><td>0960.HK</td><td>2024-04</td><td class='red'>-10.00%</td><td>⛔STOP</td></tr><tr><td>0968.HK</td><td>2024-11</td><td class='red'>-10.00%</td><td>⛔STOP</td></tr><tr><td>6098.HK</td><td>2025-04</td><td class='red'>-10.00%</td><td>⛔STOP</td></tr><tr><td>1093.HK</td><td>2025-05</td><td class='red'>-10.00%</td><td>⛔STOP</td></tr><tr><td>1024.HK</td><td>2025-08</td><td class='red'>-10.00%</td><td>⛔STOP</td></tr></tbody></table></div></div><a href="#" class="nav-top">↑ Top</a>
+<script>
+function filterRows(){const q=document.getElementById('searchBox').value.toLowerCase();
+document.querySelectorAll('tbody tr').forEach(r=>{const t=r.dataset.ticker||'';const m=r.dataset.month||'';
+r.style.display=(!q||t.includes(q)||m.includes(q))?'':'none'})}
+</script></body></html>
