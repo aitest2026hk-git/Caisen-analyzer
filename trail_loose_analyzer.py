@@ -1,6 +1,9 @@
 """
-Trail + Smart Loose Analyzer (月度选股工具)
-============================================
+蔡森 Trail-Loose 月度轮动器 (TrailLoose)
+========================================
+基于蔡森量价理论，用 Chandelier Exit 趋势跟踪 + Smart 多维过滤，
+每月在港股蓝筹中选出最优标的的月度轮动策略。
+
 策略: Trail Analyzer (Chandelier Exit) + Smart Loose Filters
 模式: 月末扫描 → 次月第1交易日买入 → 月末最后交易日卖出
 
@@ -167,7 +170,7 @@ def print_scan_results(passed, all_candidates, cutoff_date=None):
     """Pretty-print scan results."""
     label = f" (as of {cutoff_date})" if cutoff_date else ""
     print("=" * 100)
-    print(f"🔍 Trail + Smart LOOSE Analyzer — Monthly Scan{label}")
+    print(f"🔍 蔡森 Trail-Loose 月度轮动器 (TrailLoose){label}")
     print(f"   Data source: {DATA_FILE}")
     print(f"   Strategy: Loose (R:R≥2, Vol≥0.5, ATR 2-8%, Stop≤10%, UP trend)")
     print("=" * 100)
