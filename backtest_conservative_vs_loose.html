@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trail + Smart Filters — 8-Year Backtest (Conservative vs Loose)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e0e0e0; padding: 24px; }
+  h1 { font-size: 28px; margin-bottom: 8px; color: #fff; }
+  .subtitle { color: #888; font-size: 14px; margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .card { background: #1a1d27; border-radius: 12px; padding: 24px; border: 1px solid #2a2d3a; }
+  .card h2 { font-size: 18px; margin-bottom: 16px; }
+  .card.conservative h2 { color: #4ade80; }
+  .card.loose h2 { color: #f59e0b; }
+  .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #2a2d3a; }
+  .stat-row:last-child { border: none; }
+  .stat-label { color: #888; font-size: 14px; }
+  .stat-value { font-weight: 600; font-size: 14px; }
+  .positive { color: #4ade80; }
+  .negative { color: #ef4444; }
+  .chart-container { background: #1a1d27; border-radius: 12px; padding: 24px; border: 1px solid #2a2d3a; margin-bottom: 24px; }
+  .chart-container h2 { font-size: 18px; margin-bottom: 16px; color: #fff; }
+  canvas { width: 100% !important; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; padding: 10px 12px; border-bottom: 2px solid #2a2d3a; color: #888; font-weight: 500; }
+  td { padding: 10px 12px; border-bottom: 1px solid #1e2130; }
+  tr:hover { background: #1e2130; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+  .badge-green { background: #064e3b; color: #4ade80; }
+  .badge-red { background: #7f1d1d; color: #ef4444; }
+  .badge-yellow { background: #78350f; color: #f59e0b; }
+  .note { background: #1a1d27; border-left: 4px solid #4ade80; padding: 16px 20px; border-radius: 0 8px 8px 0; margin-bottom: 24px; font-size: 14px; line-height: 1.6; }
+  .full-width { grid-column: 1 / -1; }
+  @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<h1>📈 Trail + Smart Filters — 8-Year Backtest</h1>
+<p class="subtitle">Conservative vs Loose | Oct 2018 – Apr 2026 | HK Blue Chip (75 stocks)</p>
+
+<div class="note">
+  <strong>Trading Principle Confirmed:</strong> All 182 trades buy on the <strong>1st trading day</strong> of each month and sell on the <strong>last trading day</strong> of each month. 0 deviations out of 182 trades.<br>
+  <strong>Strategy:</strong> Trail Analyzer (Chandelier Exit monthly rotation) + Smart Filters (R:R, volume, trend, ATR, stop distance).
+</div>
+
+<div class="grid">
+
+  <div class="card conservative">
+    <h2>🛡️ Conservative</h2>
+    <div class="stat-row"><span class="stat-label">Total Trades</span><span class="stat-value">15</span></div>
+    <div class="stat-row"><span class="stat-label">Win Rate</span><span class="stat-value">53.3%</span></div>
+    <div class="stat-row"><span class="stat-label">Avg Win</span><span class="stat-value positive">+12.86%</span></div>
+    <div class="stat-row"><span class="stat-label">Avg Loss</span><span class="stat-value negative">-5.43%</span></div>
+    <div class="stat-row"><span class="stat-label">Total Return</span><span class="stat-value positive">+74.1%</span></div>
+    <div class="stat-row"><span class="stat-label">CAGR</span><span class="stat-value">55.9%</span></div>
+    <div class="stat-row"><span class="stat-label">Max Drawdown</span><span class="stat-value negative">15.4%</span></div>
+    <div class="stat-row"><span class="stat-label">Profit Factor</span><span class="stat-value">2.70</span></div>
+    <div class="stat-row"><span class="stat-label">Sharpe Ratio</span><span class="stat-value">1.35</span></div>
+    <div class="stat-row"><span class="stat-label">Config</span><span class="stat-value" style="font-size:12px">R:R≥3.0 | ATR 3-6% | Stop≤8.0%</span></div>
+  </div>
+  <div class="card loose">
+    <h2>⚡ Loose</h2>
+    <div class="stat-row"><span class="stat-label">Total Trades</span><span class="stat-value">33</span></div>
+    <div class="stat-row"><span class="stat-label">Win Rate</span><span class="stat-value">63.6%</span></div>
+    <div class="stat-row"><span class="stat-label">Avg Win</span><span class="stat-value positive">+13.73%</span></div>
+    <div class="stat-row"><span class="stat-label">Avg Loss</span><span class="stat-value negative">-6.29%</span></div>
+    <div class="stat-row"><span class="stat-label">Total Return</span><span class="stat-value positive">+508.0%</span></div>
+    <div class="stat-row"><span class="stat-label">CAGR</span><span class="stat-value">92.8%</span></div>
+    <div class="stat-row"><span class="stat-label">Max Drawdown</span><span class="stat-value negative">19.0%</span></div>
+    <div class="stat-row"><span class="stat-label">Profit Factor</span><span class="stat-value">3.82</span></div>
+    <div class="stat-row"><span class="stat-label">Sharpe Ratio</span><span class="stat-value">1.63</span></div>
+    <div class="stat-row"><span class="stat-label">Config</span><span class="stat-value" style="font-size:12px">R:R≥2.0 | ATR 2-8% | Stop≤10.0%</span></div>
+  </div>
+</div>
+
+<div class="chart-container">
+  <h2>📊 Equity Curve Comparison</h2>
+  <canvas id="equityChart" height="100"></canvas>
+</div>
+
+<div class="chart-container">
+  <h2>📉 Drawdown Comparison</h2>
+  <canvas id="ddChart" height="80"></canvas>
+</div>
+
+<div class="grid">
+  <div class="card full-width">
+    <h2>📅 Yearly Breakdown</h2>
+    <table>
+      <thead>
+        <tr><th>Year</th>
+            <th colspan="4" style="text-align:center;color:#4ade80">🛡️ Conservative</th>
+            <th colspan="4" style="text-align:center;color:#f59e0b">⚡ Loose</th></tr>
+        <tr>
+          <th></th>
+          <th>Trades</th><th>WR%</th><th>Return</th><th>MaxDD</th>
+          <th>Trades</th><th>WR%</th><th>Return</th><th>MaxDD</th>
+        </tr>
+      </thead>
+      <tbody>
+<tr><td><strong>2018</strong></td><td colspan="4" style="color:#555">—</td><td>1</td><td>0%</td><td class="negative">-2.2%</td><td>2.2%</td></tr><tr><td><strong>2020</strong></td><td>3</td><td>67%</td><td class="positive">+29.4%</td><td>3.1%</td><td>6</td><td>67%</td><td class="positive">+74.8%</td><td>16.9%</td></tr><tr><td><strong>2021</strong></td><td colspan="4" style="color:#555">—</td><td>1</td><td>100%</td><td class="positive">+3.7%</td><td>0.0%</td></tr><tr><td><strong>2022</strong></td><td>3</td><td>67%</td><td class="positive">+6.2%</td><td>15.4%</td><td>5</td><td>80%</td><td class="positive">+59.1%</td><td>2.4%</td></tr><tr><td><strong>2023</strong></td><td>4</td><td>50%</td><td class="positive">+6.1%</td><td>6.5%</td><td>9</td><td>67%</td><td class="positive">+1.5%</td><td>18.3%</td></tr><tr><td><strong>2024</strong></td><td>4</td><td>50%</td><td class="positive">+33.0%</td><td>1.9%</td><td>6</td><td>67%</td><td class="positive">+54.1%</td><td>1.7%</td></tr><tr><td><strong>2025</strong></td><td>1</td><td>0%</td><td class="negative">-10.2%</td><td>10.2%</td><td>4</td><td>25%</td><td class="positive">+7.9%</td><td>19.0%</td></tr><tr><td><strong>2026</strong></td><td colspan="4" style="color:#555">—</td><td>1</td><td>100%</td><td class="positive">+27.6%</td><td>0.0%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2 style="color:#4ade80">🛡️ Conservative — Trade Log</h2>
+    <table>
+      <thead><tr><th>Date</th><th>Stock</th><th>Buy</th><th>Sell</th><th>PnL</th><th>R:R</th></tr></thead>
+      <tbody>
+<tr><td>2020-02</td><td>2688.HK</td><td>89.10</td><td>86.35</td><td class="negative">-3.1%</td><td>18.5</td></tr><tr><td>2020-05</td><td>0981.HK</td><td>14.30</td><td>16.84</td><td class="positive">+17.8%</td><td>4.1</td></tr><tr><td>2020-05</td><td>0291.HK</td><td>36.20</td><td>41.05</td><td class="positive">+13.4%</td><td>3.5</td></tr><tr><td>2022-01</td><td>1378.HK</td><td>8.23</td><td>8.71</td><td class="positive">+5.8%</td><td>9.5</td></tr><tr><td>2022-01</td><td>2688.HK</td><td>146.80</td><td>124.20</td><td class="negative">-15.4%</td><td>3.2</td></tr><tr><td>2022-11</td><td>1177.HK</td><td>3.86</td><td>4.58</td><td class="positive">+18.6%</td><td>10.9</td></tr><tr><td>2023-03</td><td>9961.HK</td><td>277.60</td><td>293.80</td><td class="positive">+5.8%</td><td>7.7</td></tr><tr><td>2023-07</td><td>0968.HK</td><td>8.98</td><td>8.40</td><td class="negative">-6.5%</td><td>4.1</td></tr><tr><td>2023-07</td><td>2313.HK</td><td>75.85</td><td>82.05</td><td class="positive">+8.2%</td><td>6.0</td></tr><tr><td>2023-09</td><td>2020.HK</td><td>89.00</td><td>88.15</td><td class="negative">-1.0%</td><td>4.2</td></tr><tr><td>2024-02</td><td>2688.HK</td><td>58.15</td><td>64.35</td><td class="positive">+10.7%</td><td>6.8</td></tr><tr><td>2024-03</td><td>3690.HK</td><td>79.00</td><td>96.80</td><td class="positive">+22.5%</td><td>16.6</td></tr><tr><td>2024-05</td><td>0881.HK</td><td>14.38</td><td>14.14</td><td class="negative">-1.7%</td><td>6.1</td></tr><tr><td>2024-10</td><td>0669.HK</td><td>112.50</td><td>112.20</td><td class="negative">-0.3%</td><td>3.8</td></tr><tr><td>2025-03</td><td>0968.HK</td><td>3.34</td><td>3.00</td><td class="negative">-10.2%</td><td>7.0</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2 style="color:#f59e0b">⚡ Loose — Trade Log</h2>
+    <table>
+      <thead><tr><th>Date</th><th>Stock</th><th>Buy</th><th>Sell</th><th>PnL</th><th>R:R</th></tr></thead>
+      <tbody>
+<tr><td>2018-12</td><td>0027.HK</td><td>50.90</td><td>49.80</td><td class="negative">-2.2%</td><td>3.6</td></tr><tr><td>2020-02</td><td>2688.HK</td><td>89.10</td><td>86.35</td><td class="negative">-3.1%</td><td>18.5</td></tr><tr><td>2020-02</td><td>0241.HK</td><td>10.78</td><td>14.94</td><td class="positive">+38.6%</td><td>2.4</td></tr><tr><td>2020-03</td><td>1810.HK</td><td>12.56</td><td>10.44</td><td class="negative">-16.9%</td><td>2.3</td></tr><tr><td>2020-05</td><td>0981.HK</td><td>14.30</td><td>16.84</td><td class="positive">+17.8%</td><td>4.1</td></tr><tr><td>2020-05</td><td>0291.HK</td><td>36.20</td><td>41.05</td><td class="positive">+13.4%</td><td>3.5</td></tr><tr><td>2020-11</td><td>2382.HK</td><td>130.00</td><td>152.40</td><td class="positive">+17.2%</td><td>2.1</td></tr><tr><td>2021-11</td><td>0322.HK</td><td>14.56</td><td>15.10</td><td class="positive">+3.7%</td><td>2.5</td></tr><tr><td>2022-01</td><td>1378.HK</td><td>8.23</td><td>8.71</td><td class="positive">+5.8%</td><td>9.5</td></tr><tr><td>2022-03</td><td>1378.HK</td><td>10.72</td><td>10.46</td><td class="negative">-2.4%</td><td>3.5</td></tr><tr><td>2022-05</td><td>1211.HK</td><td>75.67</td><td>93.33</td><td class="positive">+23.4%</td><td>5.0</td></tr><tr><td>2022-07</td><td>2269.HK</td><td>70.80</td><td>74.55</td><td class="positive">+5.3%</td><td>5.3</td></tr><tr><td>2022-11</td><td>1177.HK</td><td>3.86</td><td>4.58</td><td class="positive">+18.6%</td><td>10.9</td></tr><tr><td>2023-02</td><td>9888.HK</td><td>133.00</td><td>134.80</td><td class="positive">+1.4%</td><td>2.1</td></tr><tr><td>2023-03</td><td>9961.HK</td><td>277.60</td><td>293.80</td><td class="positive">+5.8%</td><td>7.7</td></tr><tr><td>2023-03</td><td>9633.HK</td><td>43.60</td><td>45.15</td><td class="positive">+3.6%</td><td>4.3</td></tr><tr><td>2023-07</td><td>0968.HK</td><td>8.98</td><td>8.40</td><td class="negative">-6.5%</td><td>4.1</td></tr><tr><td>2023-07</td><td>2313.HK</td><td>75.85</td><td>82.05</td><td class="positive">+8.2%</td><td>6.0</td></tr><tr><td>2023-08</td><td>0241.HK</td><td>5.61</td><td>4.63</td><td class="negative">-17.5%</td><td>2.3</td></tr><tr><td>2023-09</td><td>2020.HK</td><td>89.00</td><td>88.15</td><td class="negative">-1.0%</td><td>4.2</td></tr><tr><td>2023-10</td><td>2269.HK</td><td>44.50</td><td>48.60</td><td class="positive">+9.2%</td><td>3.0</td></tr><tr><td>2023-11</td><td>2313.HK</td><td>77.50</td><td>78.40</td><td class="positive">+1.2%</td><td>2.3</td></tr><tr><td>2024-02</td><td>2688.HK</td><td>58.15</td><td>64.35</td><td class="positive">+10.7%</td><td>6.8</td></tr><tr><td>2024-02</td><td>0316.HK</td><td>117.80</td><td>121.70</td><td class="positive">+3.3%</td><td>2.1</td></tr><tr><td>2024-03</td><td>3690.HK</td><td>79.00</td><td>96.80</td><td class="positive">+22.5%</td><td>16.6</td></tr><tr><td>2024-05</td><td>0881.HK</td><td>14.38</td><td>14.14</td><td class="negative">-1.7%</td><td>6.1</td></tr><tr><td>2024-06</td><td>2382.HK</td><td>43.00</td><td>48.25</td><td class="positive">+12.2%</td><td>8.7</td></tr><tr><td>2024-10</td><td>0669.HK</td><td>112.50</td><td>112.20</td><td class="negative">-0.3%</td><td>3.8</td></tr><tr><td>2025-01</td><td>0386.HK</td><td>4.44</td><td>4.26</td><td class="negative">-4.0%</td><td>4.9</td></tr><tr><td>2025-02</td><td>0981.HK</td><td>38.60</td><td>53.60</td><td class="positive">+38.9%</td><td>2.4</td></tr><tr><td>2025-03</td><td>0968.HK</td><td>3.34</td><td>3.00</td><td class="negative">-10.2%</td><td>7.0</td></tr><tr><td>2025-12</td><td>1109.HK</td><td>30.16</td><td>27.20</td><td class="negative">-9.8%</td><td>2.6</td></tr><tr><td>2026-01</td><td>2628.HK</td><td>27.34</td><td>34.88</td><td class="positive">+27.6%</td><td>2.1</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const consDates = ["2018-09", "2020-02", "2020-05", "2020-05", "2022-01", "2022-01", "2022-11", "2023-03", "2023-07", "2023-07", "2023-09", "2024-02", "2024-03", "2024-05", "2024-10", "2025-03"];
+const consEq = [100.0, 96.9, 114.1, 129.4, 137.0, 115.9, 137.5, 145.5, 136.1, 147.2, 145.8, 161.4, 197.7, 194.4, 193.9, 174.1];
+const consDD = [0.0, 3.1, 0.0, 0.0, 0.0, 15.4, 0.0, 0.0, 6.5, 0.0, 1.0, 0.0, 0.0, 1.7, 1.9, 11.9];
+const looseDates = ["2018-09", "2018-12", "2020-02", "2020-02", "2020-03", "2020-05", "2020-05", "2020-11", "2021-11", "2022-01", "2022-03", "2022-05", "2022-07", "2022-11", "2023-02", "2023-03", "2023-03", "2023-07", "2023-07", "2023-08", "2023-09", "2023-10", "2023-11", "2024-02", "2024-02", "2024-03", "2024-05", "2024-06", "2024-10", "2025-01", "2025-02", "2025-03", "2025-12", "2026-01"];
+const looseEq = [100.0, 97.8, 94.8, 131.4, 109.2, 128.6, 145.9, 171.0, 177.3, 187.7, 183.1, 225.9, 237.8, 282.2, 286.0, 302.7, 313.5, 293.2, 317.2, 261.8, 259.3, 283.1, 286.4, 317.0, 327.5, 401.2, 394.5, 442.7, 441.5, 423.6, 588.2, 528.4, 476.5, 608.0];
+const looseDD = [0.0, 2.2, 5.2, 0.0, 16.9, 2.1, 0.0, 0.0, 0.0, 0.0, 2.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.5, 0.0, 17.5, 18.3, 10.7, 9.7, 0.1, 0.0, 0.0, 1.7, 0.0, 0.3, 4.3, 0.0, 10.2, 19.0, 0.0];
+
+// Equity Chart
+new Chart(document.getElementById('equityChart'), {
+  type: 'line',
+  data: {
+    labels: consDates,
+    datasets: [
+      {
+        label: 'Conservative',
+        data: consDates.map((d,i) => consEq[i]),
+        borderColor: '#4ade80',
+        backgroundColor: 'rgba(74,222,128,0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 2,
+        borderWidth: 2,
+      },
+      {
+        label: 'Loose',
+        data: looseDates.map((d,i) => looseEq[i]),
+        borderColor: '#f59e0b',
+        backgroundColor: 'rgba(245,158,11,0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 2,
+        borderWidth: 2,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { labels: { color: '#e0e0e0' } },
+      tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) } }
+    },
+    scales: {
+      x: { ticks: { color: '#888', maxTicksLimit: 12 }, grid: { color: '#1e2130' } },
+      y: { ticks: { color: '#888', callback: v => v.toFixed(0) }, grid: { color: '#1e2130' }, title: { display: true, text: 'Equity (start=100)', color: '#888' } }
+    }
+  }
+});
+
+// Drawdown Chart
+new Chart(document.getElementById('ddChart'), {
+  type: 'line',
+  data: {
+    labels: consDates,
+    datasets: [
+      {
+        label: 'Conservative DD',
+        data: consDates.map((d,i) => -consDD[i]),
+        borderColor: '#4ade80',
+        backgroundColor: 'rgba(74,222,128,0.15)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 1,
+        borderWidth: 2,
+      },
+      {
+        label: 'Loose DD',
+        data: looseDates.map((d,i) => -looseDD[i]),
+        borderColor: '#f59e0b',
+        backgroundColor: 'rgba(245,158,11,0.15)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 1,
+        borderWidth: 2,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { labels: { color: '#e0e0e0' } },
+      tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + '%' } }
+    },
+    scales: {
+      x: { ticks: { color: '#888', maxTicksLimit: 12 }, grid: { color: '#1e2130' } },
+      y: { ticks: { color: '#888', callback: v => v.toFixed(0) + '%' }, grid: { color: '#1e2130' }, title: { display: true, text: 'Drawdown %', color: '#888' } }
+    }
+  }
+});
+</script>
+
+<div style="text-align:center;color:#555;font-size:12px;margin-top:32px;padding:16px;">
+  Generated by Trail + Smart Filters Analyzer | Data: HK Blue Chip 75 stocks | Period: Oct 2018 – Apr 2026
+</div>
+</body>
+</html>
